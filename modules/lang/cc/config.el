@@ -113,7 +113,19 @@
   (add-hook! 'irony-mode-hook '(irony-eldoc flycheck-mode))
   (add-hook! 'c++-mode-hook
     (make-local-variable 'irony-additional-clang-options)
-    (push "-std=c++11" irony-additional-clang-options)))
+    (push "-std=c++11" irony-additional-clang-options))
+  (require 'irony-cdb)
+  (require 'irony-cdb-json)
+  (require 'irony-cdb-libclang)
+  (require 'irony-cdb-clang-complete)
+  (add-hook 'irony-mode-hook 'irony-cdb-autosetup-compile-options)
+  ;; some c-mode dervied modes wrongfully trigger these hooks (like php-mode)
+  (add-hook! (c-mode c++-mode objc-mode)
+    (when (memq major-mode '(c-mode c++-mode objc-mode))
+      (flycheck-mode +1)
+      (irony-mode +1)
+      (eldoc-mode +1)
+      (irony-eldoc +1))))
 
 (def-package! irony-eldoc :after irony)
 
