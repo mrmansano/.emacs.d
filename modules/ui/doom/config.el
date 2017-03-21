@@ -4,7 +4,7 @@
   "The color theme currently in use.")
 
 (defvar +doom-font
-  (font-spec :name "Source Code Pro" :size 12)
+  (font-spec :name "Source Code Pro Semibold" :size 12)
   "The font currently in use.")
 
 (defvar +doom-variable-pitch-font

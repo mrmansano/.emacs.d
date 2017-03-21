@@ -104,9 +104,28 @@
   :commands modern-c++-font-lock-mode
   :init (add-hook 'c++-mode-hook 'modern-c++-font-lock-mode))
 
+(def-package! semantic
+  :after cc-mode
+  :config
+  (global-semanticdb-minor-mode 1)
+  (global-semantic-idle-scheduler-mode 1)
+  (semantic-mode 1)
+
+  ;; Prohibit semantic from searching through system headers. We want
+  ;; company-clang to do that for us.
+  (setq-mode-local c-mode semanticdb-find-default-throttle
+                   '(local project unloaded recursive))
+  (setq-mode-local c++-mode semanticdb-find-default-throttle
+                   '(local project unloaded recursive))
+
+  (semantic-remove-system-include "/usr/include/" 'c++-xmode)
+  (semantic-remove-system-include "/usr/local/include/" 'c++-mode)
+  (add-hook 'semantic-init-hooks
+            'semantic-reset-system-include)
+  )
 
 (def-package! irony
-  :after cc-mode
+  :after semantic
   :init (add-hook 'c-mode-common-hook 'irony-mode)
   :config
   (setq irony-server-install-prefix (concat doom-etc-dir "irony-server/"))
@@ -134,7 +153,31 @@
   :after irony
   :config (flycheck-irony-setup))
 
+(def-package! rtags
+  :after irony
+  :config
+  (setq rtags-autostart-diagnostics t)
+  (rtags-enable-standard-keybindings))
 
+(def-package! clang-format
+  :after cc-mode
+  :config
+  (global-set-key (kbd "C-c i") 'clang-format-region)
+  (global-set-key (kbd "C-c u") 'clang-format-buffer)
+  (defun my-c-mode-format-on-save ()
+    "Format with clang-format before save"
+    (setq-local clang-format-style "Google")
+    (add-hook 'before-save-hook 'clang-format-buffer nil 'make-it-local)
+    )
+  (add-hook 'c-mode-common-hook #'my-c-mode-format-on-save)
+  )
+
+(def-package! google-c-style
+  :after cc-mode
+  :config
+  (add-hook 'c-mode-common-hook 'google-set-c-style)
+  ;; Autoindent using google style guide
+  (add-hook 'c-mode-common-hook 'google-make-newline-indent))
 ;;
 ;; Tools
 ;;

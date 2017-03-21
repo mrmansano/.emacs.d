@@ -10,6 +10,9 @@
 (package! irony-eldoc)
 (package! opencl-mode)
 (package! modern-cpp-font-lock)
+(package! rtags)
+(package! clang-format)
+(package! google-c-style)
 
 (when (featurep! :feature syntax-checker)
   (package! flycheck-irony))
