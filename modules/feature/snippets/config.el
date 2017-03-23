@@ -24,7 +24,9 @@
         yas-also-auto-indent-first-line t
         yas-prompt-functions '(yas-completing-prompt yas-ido-prompt yas-no-prompt)
         yas-snippet-dirs '(yas-installed-snippets-dir)
-        yas-use-menu nil)
+        yas-use-menu nil
+        ;; Allow nested snippets
+        yas-triggers-in-field t)
 
   ;; Allows project-specific snippets
   (defun +snippets|enable-project-modes (mode &rest _)
@@ -43,12 +45,10 @@
             "C-a"           '+snippets/goto-start-of-field
             "<M-right>"     '+snippets/goto-end-of-field
             "<M-left>"      '+snippets/goto-start-of-field
-            "<S-tab>"       'yas-prev-field
-            "<backtab>"     'yas-prev-field
             "<M-backspace>" '+snippets/delete-to-start-of-field
-            "<escape>"      'evil-normal-state
+            [escape]        'evil-normal-state
             [backspace]     '+snippets/delete-backward-char
-            "<delete>"      '+snippets/delete-forward-char-or-field)
+            [delete]        '+snippets/delete-forward-char-or-field)
 
           (:map yas-minor-mode-map
             :i [tab] 'yas-expand
