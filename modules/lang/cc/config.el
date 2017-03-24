@@ -178,6 +178,10 @@
   (add-hook 'c-mode-common-hook 'google-set-c-style)
   ;; Autoindent using google style guide
   (add-hook 'c-mode-common-hook 'google-make-newline-indent))
+
+(def-package! srefactor
+  :after semantic
+  :config (require 'srefactor-lisp))
 ;;
 ;; Tools
 ;;

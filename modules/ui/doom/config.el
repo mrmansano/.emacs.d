@@ -4,11 +4,11 @@
   "The color theme currently in use.")
 
 (defvar +doom-font
-  (font-spec :name "Source Code Pro Semibold" :size 12)
+  (font-spec :name "Source Code Pro Medium" :size 12)
   "The font currently in use.")
 
 (defvar +doom-variable-pitch-font
-  (font-spec :family "Fira Sans" :size 14)
+  (font-spec :name "Source Sans Pro Medium" :size 13)
   "The font currently in use.")
 
 (defvar +doom-unicode-font
@@ -79,7 +79,7 @@
   ;; Add file icons to doom-neotree
   (require 'doom-neotree)
   (setq doom-neotree-enable-variable-pitch t
-        doom-neotree-file-icons 'simple
+        doom-neotree-file-icons t
         doom-neotree-line-spacing 3)
 
   ;; Add line-highlighting to nlinum

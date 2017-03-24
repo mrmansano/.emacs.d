@@ -13,6 +13,7 @@
 (package! rtags)
 (package! clang-format)
 (package! google-c-style)
+(package! srefactor)
 
 (when (featurep! :feature syntax-checker)
   (package! flycheck-irony))
