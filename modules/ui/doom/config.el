@@ -4,7 +4,7 @@
   "The color theme currently in use.")
 
 (defvar +doom-font
-  (font-spec :name "Fira Mono Medium for Powerline" :size 12)
+  (font-spec :name "Source Code Pro Medium" :size 12)
   "The font currently in use.")
 
 (defvar +doom-variable-pitch-font
@@ -42,6 +42,8 @@
 (def-package! doom-themes :demand t
   :config
   (load-theme +doom-theme t)
+
+  (setq doom-enable-bold nil)
 
   (defface +doom-folded-face
     `((t (:inherit font-lock-comment-face
