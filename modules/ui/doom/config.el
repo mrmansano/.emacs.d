@@ -4,11 +4,11 @@
   "The color theme currently in use.")
 
 (defvar +doom-font
-  (font-spec :name "Source Code Pro Medium" :size 12)
+  (font-spec :name "Fira Mono Medium for Powerline" :size 12)
   "The font currently in use.")
 
 (defvar +doom-variable-pitch-font
-  (font-spec :name "Source Sans Pro Medium" :size 13)
+  (font-spec :name "Fira Sans Medium" :size 13)
   "The font currently in use.")
 
 (defvar +doom-unicode-font
