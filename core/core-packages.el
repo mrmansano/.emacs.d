@@ -148,27 +148,6 @@ to speed up startup."
     (mapc (lambda (keyword) (setq use-package-keywords (delq keyword use-package-keywords)))
           '(:ensure :pin :defer-install))
 
-    ;; In a recent update, the :after property stopped working for `use-package'.
-    ;; This fixes the problem, but must be removed as soon as the fix is released.
-    ;; See https://github.com/jwiegley/use-package/pull/439
-    (defun doom*use-package-handler/:after (name keyword arg rest state)
-      (let ((body (use-package-process-keywords name rest
-                    (plist-put state :deferred t)))
-            (name-string (use-package-as-string name)))
-        (if (and (consp arg)
-                 (not (memq (car arg) '(:or :any :and :all))))
-            (setq arg (cons :all arg)))
-        (use-package-concat
-         (when arg
-           (list (funcall (use-package-require-after-load arg)
-                          (macroexp-progn
-                           `(,@(when (eq (plist-get state :defer-install) :ensure)
-                                 `((use-package-install-deferred-package
-                                    'name :after)))
-                             (require (quote ,name) nil t))))))
-         body)))
-    (advice-add 'use-package-handler/:after :override 'doom*use-package-handler/:after)
-
     (setq doom-init-p t)))
 
 (defun doom-initialize-autoloads (&optional inhibit-reload-p)
@@ -250,9 +229,10 @@ files."
   "Returns `doom-modules' as a list of (MODULE . SUBMODULE) cons cells. The list
 is sorted by order of insertion."
   (let (pairs)
-    (maphash (lambda (key value) (push (cons (car key) (cdr key)) pairs))
-             doom-modules)
-    (nreverse pairs)))
+    (when (hash-table-p doom-modules)
+      (maphash (lambda (key value) (push (cons (car key) (cdr key)) pairs))
+               doom-modules)
+      (nreverse pairs))))
 
 (defun doom--module-paths (&optional append-file)
   "Returns a list of absolute file paths to modules, with APPEND-FILE added, if
@@ -393,10 +373,19 @@ SUBMODULE is a symbol."
 ;;
 
 (defun doom/reload ()
-  "Reload `load-path'; useful if you modify/update packages outside of emacs."
+  "Reload `load-path' and recompile files (if necessary). Useful if you
+modify/update packages outside of emacs. Automatically called (through the
+server, if necessary) by `doom/packages-install', `doom/packages-update' and
+`doom/packages-autoremove'. "
   (interactive)
-  (doom-initialize t)
-  (message "Reloaded %d packages" (length doom--package-load-path)))
+  (if noninteractive
+      (progn
+        (require 'server)
+        (ignore-errors
+          (server-eval-at "server" '(let (noninteractive) (doom/reload)))))
+    (doom-initialize t)
+    (doom/compile t)
+    (message "Reloaded %d packages" (length doom--package-load-path))))
 
 (defun doom/reload-autoloads ()
   "Refreshes the autoloads.el file, which tells Emacs where to find all the
@@ -445,34 +434,50 @@ the commandline."
        (delete-file generated-autoload-file)
        (error "Couldn't evaluate autoloads.el: %s" (cadr ex))))))
 
-(defun doom/recompile ()
-  "Byte (re)compile the important files in your emacs configuration (init.el,
-core/*.el & modules/*/*/**.el). DOOM Emacs was designed to benefit from this.
-This may take a while."
+(defun doom/compile (&optional recompile-p lite-p)
+  "Byte compile your emacs configuration (init.el, core/*.el &
+modules/*/*/**.el). DOOM Emacs was designed to benefit from this, but it may
+take a while.
+
+If RECOMPILE-P is non-nil, don't byte-compile *.el files that don't have an
+accompanying *.elc file."
   (interactive)
   ;; Ensure all relevant config files are loaded. This way we don't need
   ;; eval-when-compile and require blocks scattered all over.
   (doom-initialize-packages (not noninteractive) noninteractive)
   (let ((targets
-         (append (list (expand-file-name "init.el" doom-emacs-dir)
-                       (expand-file-name "core.el" doom-core-dir))
-                 (file-expand-wildcards (expand-file-name "core-*.el" doom-core-dir))
-                 (file-expand-wildcards (expand-file-name "autoload/*.el" doom-core-dir))))
+         (append (list (expand-file-name "init.el" doom-emacs-dir))
+                 (reverse (directory-files-recursively doom-core-dir "\\.el$"))))
         (n 0)
         results)
-    (dolist (path (doom--module-paths))
-      (nconc targets (nreverse (directory-files-recursively path "\\.el$"))))
+    (unless lite-p
+      (dolist (path (doom--module-paths))
+        (nconc targets (nreverse (directory-files-recursively path "\\.el$")))))
+    (when recompile-p
+      (setq targets (cl-remove-if-not (lambda (file) (file-exists-p (concat (file-name-sans-extension file) ".elc")))
+                                      targets)))
     (dolist (file targets)
       (push (cons (file-relative-name file doom-emacs-dir)
-                  (and (byte-recompile-file file nil 0)
-                       (setq n (1+ n))))
+                  (byte-recompile-file file nil (unless recompile-p 0)))
             results))
-    (when noninteractive
-      (if targets (message "\n"))
-      (message "Compiled %s/%s files" n (length results))
-      (when-let (errors (cl-remove-if 'cdr results))
+    (let* ((n-fail (cl-count-if (lambda (x) (null (cdr x))) results))
+           (n-nocompile (cl-count-if (lambda (x) (eq (cdr x) 'no-byte-compile)) results))
+           (total (- (length results) n-nocompile))
+           (total-success (- total n-fail)))
+      (when (> total-success 0)
+        (message "\n"))
+      (when (> n-fail 0)
         (message "\n%s" (mapconcat (lambda (file) (concat "+ ERROR: " (car file)))
-                                   (nreverse errors) "\n"))))))
+                                   (cl-remove-if 'cdr (reverse results)) "\n")))
+      (message "%s %s file(s)"
+               (if recompile-p "Recompiled" "Compiled")
+               (format (if (= total 0) "%s" "%s/%s") total-success total)))))
+
+(defun doom/compile-lite (&optional recompile-p)
+  "A light-weight version of `doom/compile' which only compiles core files in
+your emacs configuration (init.el and core/**/*.el)."
+  (interactive)
+  (doom/compile recompile-p t))
 
 (defun doom/clean-cache ()
   "Clear local cache (`doom-cache-dir'). You may need to restart Emacs for some
@@ -496,6 +501,27 @@ package files."
 ;;
 
 (advice-add 'package-delete :after 'doom*package-delete)
+
+;; In a recent update, the :after property stopped working for `use-package'.
+;; This fixes the problem, but must be removed as soon as the fix is released.
+;; See https://github.com/jwiegley/use-package/pull/439
+(defun doom*use-package-handler/:after (name keyword arg rest state)
+  (let ((body (use-package-process-keywords name rest
+                (plist-put state :deferred t)))
+        (name-string (use-package-as-string name)))
+    (if (and (consp arg)
+             (not (memq (car arg) '(:or :any :and :all))))
+        (setq arg (cons :all arg)))
+    (use-package-concat
+     (when arg
+       (list (funcall (use-package-require-after-load arg)
+                      (macroexp-progn
+                       `(,@(when (eq (plist-get state :defer-install) :ensure)
+                             `((use-package-install-deferred-package
+                                'name :after)))
+                         (require (quote ,name) nil t))))))
+     body)))
+(advice-add 'use-package-handler/:after :override 'doom*use-package-handler/:after)
 
 (provide 'core-packages)
 ;;; core-packages.el ends here

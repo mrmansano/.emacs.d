@@ -18,7 +18,7 @@ state are passed in.")
         projectile-globally-ignored-files '(".DS_Store" "Icon")
         projectile-indexing-method 'alien
         projectile-known-projects-file (concat doom-cache-dir "projectile.projects")
-        projectile-project-root-files '(".git" ".hg" ".svn" ".project")
+        projectile-project-root-files '(".git" ".hg" ".svn" ".project" "package.json")
         projectile-require-project-root nil)
 
   :config
@@ -128,7 +128,7 @@ see if NAME should be activated.
              :files ,files
              :when ,when))
        (add-hook! ,name
-         (run-hook-with-args doom-project-hook ',name))
+         (run-hook-with-args 'doom-project-hook ',name))
        ,(when init-form
           `(add-transient-hook! ',(intern-soft (format "%s-hook" name))
              ,init-form)))))

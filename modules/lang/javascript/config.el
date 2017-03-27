@@ -11,18 +11,27 @@
         js2-mode-show-parse-errors nil)
 
   (add-hook! 'js2-mode-hook
-    '(flycheck-mode highlight-indent-guides-mode rainbow-delimiters-mode))
+    '(flycheck-mode highlight-indentation-mode rainbow-delimiters-mode))
 
   ;; Conform switch-case indentation to editorconfig's config
   (add-hook! 'js2-mode-hook (setq js-switch-indent-offset js-indent-level))
 
-  (set! :repl 'js2-mode 'nodejs-repl)
+  ;; Favor local eslint over global, if available
+  (add-hook! 'flycheck-mode-hook
+    (when (derived-mode-p 'js-mode 'js2-mode)
+      (when-let ((eslint (expand-file-name "node_modules/eslint/bin/eslint.js" (doom-project-root)))
+                 (exists-p (file-exists-p eslint))
+                 (executable-p (file-executable-p eslint)))
+        (setq-local flycheck-javascript-eslint-executable eslint))))
+
+  (set! :repl 'js2-mode '+javascript/repl)
   (set! :electric 'js2-mode :chars '(?\} ?\) ?.) :words '("||" "&&"))
   (set! :xref-backend 'js2-mode 'xref-js2-xref-backend)
 
   (map! :map js2-mode-map
         :localleader
         :nv ";" 'doom/append-semicolon
+        :n  "s" '+javascript/skewer-this-buffer
 
         :prefix "r"
         :n  "g"  'js2r-add-to-globals-annotation
@@ -85,7 +94,13 @@
   (set! :company-backend 'js2-mode '(company-tern)))
 
 
-(def-package! jsx-mode :mode "\\.jsx$")
+(def-package! rjsx-mode
+  :commands rjsx-mode
+  :mode "\\.jsx$"
+  :config
+  (add-hook! rjsx-mode
+    ;; jshint doesn't really know how to deal with jsx
+    (push 'javascript-jshint flycheck-disabled-checkers)))
 
 
 (def-package! coffee-mode
@@ -93,9 +108,44 @@
   :init (setq coffee-indent-like-python-mode t))
 
 
-(def-package! web-beautify :commands web-beautify-js
+(def-package! web-beautify
+  :commands web-beautify-js
   :init
   (map! :map* (json-mode js2-mode-map) :n "gQ" 'web-beautify-js))
+
+
+;;
+;; Skewer-mode
+;;
+
+(def-package! skewer-mode
+  :commands (skewer-mode run-skewer)
+  :config
+  (map! :map skewer-mode-map
+        :localleader
+        :n "s" nil
+        :n "sE" 'skewer-eval-last-expression
+        :n "se" 'skewer-eval-defun
+        :n "sf" 'skewer-load-buffer))
+
+(def-package! skewer-css-mode ; in skewer-mode
+  :commands skewer-css-mode
+  :config
+  (map! :map skewer-css-mode-map
+        :localleader
+        :n "s" nil
+        :n "se" 'skewer-css-eval-current-declaration
+        :n "sr" 'skewer-css-eval-current-rule
+        :n "sb" 'skewer-css-eval-buffer
+        :n "sc" 'skewer-css-clear-all))
+
+(def-package! skewer-html-mode ; in skewer-mode
+  :commands skewer-html-mode
+  :config
+  (map! :map skewer-html-mode-map
+        :localleader
+        :n "s" nil
+        :n "se" 'skewer-html-eval-tag))
 
 
 ;;
@@ -106,11 +156,11 @@
   :files "gulpfile.js")
 
 (def-project-mode! +javascript-npm-mode
-  :modes (web-mode js-mode markdown-mode)
+  :modes (web-mode js2-mode markdown-mode)
   :files "package.json")
 
 (def-project-mode! +javascript-lb6-mode
-  :modes (web-mode js-mode nxml-mode markdown-mode)
+  :modes (web-mode js2-mode nxml-mode markdown-mode)
   :match "\\.lb\\(action\\|ext\\)/"
   :init
   ;; TODO

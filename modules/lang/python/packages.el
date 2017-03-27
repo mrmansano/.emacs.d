@@ -20,7 +20,4 @@
   (when-let (pkgs (cl-remove-if
                    (lambda (pkg) (zerop (shell-command (format "pip show %s" pkg))))
                    '("jedi" "setuptools")))
-    (funcall (if (file-writable-p (executable-find "pip")) 'sh 'sudo)
-             "pip install %s"
-             (string-join pkgs " "))
-    t))
+    (sh "pip install jedi setuptools")))

@@ -1,8 +1,10 @@
 ;;; core-lib.el
 
 (require 'cl-lib)
-(eval-when-compile
-  (require 'subr-x))
+
+;;
+(autoload 'when-let "subr-x")
+(autoload 'if-let "subr-x")
 
 ;; I don't use use-package for these to save on the `fboundp' lookups it does
 ;; for its :commands property. I use dolists instead of mapc to avoid extra
@@ -10,9 +12,11 @@
 ;; optimization.
 (dolist (sym '(async-start async-start-process async-byte-recompile-directory))
   (autoload sym "async"))
+
 (dolist (sym '(persistent-soft-exists-p persistent-soft-fetch
                persistent-soft-flush persistent-soft-store))
   (autoload sym "persistent-soft"))
+
 (dolist (sym '(s-trim s-trim-left s-trim-right s-chomp s-collapse-whitespace
                s-word-wrap s-center s-pad-left s-pad-right s-truncate s-left
                s-right s-chop-suffix s-chop-suffixes s-chop-prefix
@@ -41,7 +45,7 @@
             ,paths ,(if (or (string-prefix-p "./" paths)
                             (string-prefix-p "../" paths))
                         'default-directory
-                      root))))
+                      (or root `(doom-project-root))))))
         ((listp paths)
          (let (forms)
            (dolist (i paths (nreverse forms))
@@ -240,16 +244,36 @@ executed when called with `set!'. FORMS are not evaluated until `set!' calls it.
 (defmacro def-bootstrap! (name &rest forms)
   "TODO"
   (declare (indent defun))
-  `(push (cons ',name
-               (lambda ()
-                 (cl-flet ((sh (lambda (&rest args) (apply 'doom-sh args)))
-                           (sudo (lambda (&rest args) (apply 'doom-sudo args)))
-                           (fetch (lambda (&rest args) (apply 'doom-fetch args)))
-                           (message (lambda (&rest args)
-                                      (apply 'message (format "[%s] %s" ,(symbol-name name) (car args))
-                                             (cdr args)))))
-                   ,@forms)))
-         doom-bootstraps))
+  (let ((prereqs (plist-get forms :requires)))
+    (while (keywordp (car forms))
+      (dotimes (i 2) (pop forms)))
+    `(push (cons ',name
+                 (lambda ()
+                   (cl-flet ((sh (lambda (&rest args) (apply 'doom-sh args)))
+                             (sudo (lambda (&rest args) (apply 'doom-sudo args)))
+                             (fetch (lambda (&rest args) (apply 'doom-fetch args)))
+                             (message (lambda (&rest args)
+                                        (apply 'message (format "[%s] %s" ,(symbol-name name) (car args))
+                                               (cdr args)))))
+                     (if (not ,(if (not prereqs)
+                                   't
+                                 (unless (listp prereqs)
+                                   (setq prereqs (list prereqs)))
+                                 `(and ,@(mapcar (lambda (sym) `(doom-bootstrap ',sym)) prereqs))))
+                         (message "Aborting (prerequisites failed)")
+                       (message "Bootstrapping")
+                       ,@forms
+                       (message "Done")))))
+           doom-bootstraps)))
+
+(defun doom-bootstrap (id)
+  (when-let (bootstrap (assq id doom-bootstraps))
+    (condition-case ex
+        (progn (funcall (cdr bootstrap)) t)
+      ('error
+       (message "[%s] Aborted (ERROR: %s)"
+                id (if (eq (car ex) 'error) (cadr ex) ex))
+       nil))))
 
 (defun doom/bootstrap (ids)
   "Bootstraps a module, if it has a bootstrapper. Bootstraps are expected to be
@@ -271,12 +295,7 @@ using `doom-fetch'."
               (and err-not-func
                    (message "ERROR: These bootstraps were invalid: %s" err-not-func)))
       (error "There were errors. Aborting."))
-    (dolist (id ids)
-      (let ((bootstrap (assq id doom-bootstraps)))
-        (message "[%s] BOOTSTRAP START" id)
-        (with-demoted-errors (format "[%s] ERROR: %%s" id)
-          (unless (funcall (cdr bootstrap))
-            (message "[%s] DONE (already bootstrapped)" id)))))))
+    (mapc 'doom-bootstrap ids)))
 
 (provide 'core-lib)
 ;;; core-lib.el ends here
