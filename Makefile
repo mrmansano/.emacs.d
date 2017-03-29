@@ -18,6 +18,9 @@ autoremove: init.el
 autoloads: init.el
 	@$(EMACS) -f 'doom/reload-autoloads'
 
+recompile: init.el
+	@$(EMACS) -f 'doom/recompile'
+
 compile: init.el clean
 	@$(EMACS) -f 'doom/compile'
 
@@ -46,6 +49,9 @@ bootstrap: init.el
 # development purposes for instance).
 run:
 	@emacs $(EMACS_FLAGS) -q -l init.el
+
+reload:
+	@$(EMACS) -f 'doom/reload'
 
 init.el:
 	@[ -e init.el ] || $(error No init.el file; create one or copy init.example.el)

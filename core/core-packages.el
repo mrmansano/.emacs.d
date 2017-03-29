@@ -379,12 +379,12 @@ server, if necessary) by `doom/packages-install', `doom/packages-update' and
 `doom/packages-autoremove'. "
   (interactive)
   (if noninteractive
-      (progn
+      (ignore-errors
         (require 'server)
-        (ignore-errors
-          (server-eval-at "server" '(let (noninteractive) (doom/reload)))))
+        (unless (server-eval-at "server" '(doom/reload))
+          (message "No active emacs session running to reload")))
     (doom-initialize t)
-    (doom/compile t)
+    (doom/recompile)
     (message "Reloaded %d packages" (length doom--package-load-path))))
 
 (defun doom/reload-autoloads ()
@@ -434,13 +434,10 @@ the commandline."
        (delete-file generated-autoload-file)
        (error "Couldn't evaluate autoloads.el: %s" (cadr ex))))))
 
-(defun doom/compile (&optional recompile-p lite-p)
+(defun doom/compile (&optional lite-p)
   "Byte compile your emacs configuration (init.el, core/*.el &
 modules/*/*/**.el). DOOM Emacs was designed to benefit from this, but it may
-take a while.
-
-If RECOMPILE-P is non-nil, don't byte-compile *.el files that don't have an
-accompanying *.elc file."
+take a while."
   (interactive)
   ;; Ensure all relevant config files are loaded. This way we don't need
   ;; eval-when-compile and require blocks scattered all over.
@@ -452,13 +449,14 @@ accompanying *.elc file."
         results)
     (unless lite-p
       (dolist (path (doom--module-paths))
-        (nconc targets (nreverse (directory-files-recursively path "\\.el$")))))
-    (when recompile-p
-      (setq targets (cl-remove-if-not (lambda (file) (file-exists-p (concat (file-name-sans-extension file) ".elc")))
-                                      targets)))
+        (nconc targets (append (reverse (directory-files path t "\\.el$" t))
+                               (reverse (file-expand-wildcards (expand-file-name "*/*.el" path)))))))
     (dolist (file targets)
       (push (cons (file-relative-name file doom-emacs-dir)
-                  (byte-recompile-file file nil (unless recompile-p 0)))
+                  ;; Use `byte-recompile-file' instead of `byte-compile-file'
+                  ;; because the former distinguishes between no-byte-compile,
+                  ;; failure (nil) and success (non-nil).
+                  (byte-recompile-file file t 0))
             results))
     (let* ((n-fail (cl-count-if (lambda (x) (null (cdr x))) results))
            (n-nocompile (cl-count-if (lambda (x) (eq (cdr x) 'no-byte-compile)) results))
@@ -468,16 +466,36 @@ accompanying *.elc file."
         (message "\n"))
       (when (> n-fail 0)
         (message "\n%s" (mapconcat (lambda (file) (concat "+ ERROR: " (car file)))
-                                   (cl-remove-if 'cdr (reverse results)) "\n")))
-      (message "%s %s file(s)"
-               (if recompile-p "Recompiled" "Compiled")
+                                   (cl-remove-if-not 'cdr (reverse results)) "\n")))
+      (message "Compiled %s file(s)"
                (format (if (= total 0) "%s" "%s/%s") total-success total)))))
 
-(defun doom/compile-lite (&optional recompile-p)
+(defun doom/recompile ()
+  "Recompile any compiled *.el files in your Emacs configuration."
+  (interactive)
+  ;; Ensure all relevant config files are loaded. This way we don't need
+  ;; eval-when-compile and require blocks scattered all over.
+  (doom-initialize-packages (not noninteractive) noninteractive)
+  (let ((n 0)
+        (targets
+         (cl-remove-if-not
+          (lambda (file) (file-exists-p (concat file "c")))
+          (append (list (expand-file-name "init.el" doom-emacs-dir))
+                  (reverse (directory-files-recursively doom-core-dir "\\.el$"))
+                  (reverse (directory-files-recursively doom-modules-dir "\\.el$"))))))
+    (dolist (file targets)
+      (when (byte-compile-file file)
+        (message "+ Recompiling %s" file)
+        (cl-incf n)))
+    (if (= (length targets) 0)
+        (message "Nothing to recompile")
+      (message "Recompiled %s/%s files" n (length targets)))))
+
+(defun doom/compile-lite ()
   "A light-weight version of `doom/compile' which only compiles core files in
 your emacs configuration (init.el and core/**/*.el)."
   (interactive)
-  (doom/compile recompile-p t))
+  (doom/compile t))
 
 (defun doom/clean-cache ()
   "Clear local cache (`doom-cache-dir'). You may need to restart Emacs for some
@@ -502,27 +520,6 @@ package files."
 
 ;; Updates QUELPA after deleting a package
 (advice-add 'package-delete :after 'doom*package-delete)
-
-;; In a recent update, the :after property stopped working for `use-package'.
-;; This fixes the problem, but must be removed as soon as the fix is released.
-;; See https://github.com/jwiegley/use-package/pull/439
-(defun doom*use-package-handler/:after (name keyword arg rest state)
-  (let ((body (use-package-process-keywords name rest
-                (plist-put state :deferred t)))
-        (name-string (use-package-as-string name)))
-    (if (and (consp arg)
-             (not (memq (car arg) '(:or :any :and :all))))
-        (setq arg (cons :all arg)))
-    (use-package-concat
-     (when arg
-       (list (funcall (use-package-require-after-load arg)
-                      (macroexp-progn
-                       `(,@(when (eq (plist-get state :defer-install) :ensure)
-                             `((use-package-install-deferred-package
-                                'name :after)))
-                         (require (quote ,name) nil t))))))
-     body)))
-(advice-add 'use-package-handler/:after :override 'doom*use-package-handler/:after)
 
 (provide 'core-packages)
 ;;; core-packages.el ends here
