@@ -254,7 +254,7 @@ Used by `require!' and `depends-on!'."
 
 (defun doom--display-benchmark ()
   (message "Loaded %s packages in %.03fs"
-           (length doom--package-load-path)
+           (eval-when-compile (length doom--package-load-path))
            (setq doom-init-time (float-time (time-subtract after-init-time before-init-time)))))
 
 
@@ -379,10 +379,12 @@ server, if necessary) by `doom/packages-install', `doom/packages-update' and
 `doom/packages-autoremove'. "
   (interactive)
   (if noninteractive
-      (ignore-errors
+      (progn
+        (message "Reloading...")
         (require 'server)
-        (unless (server-eval-at "server" '(doom/reload))
-          (message "No active emacs session running to reload")))
+        (unless (ignore-errors (server-eval-at "server" '(doom/reload)))
+          (message "Recompiling")
+          (doom/recompile)))
     (doom-initialize t)
     (doom/recompile)
     (message "Reloaded %d packages" (length doom--package-load-path))))
@@ -441,7 +443,7 @@ take a while."
   (interactive)
   ;; Ensure all relevant config files are loaded. This way we don't need
   ;; eval-when-compile and require blocks scattered all over.
-  (doom-initialize-packages (not noninteractive) noninteractive)
+  (doom-initialize-packages t t)
   (let ((targets
          (append (list (expand-file-name "init.el" doom-emacs-dir))
                  (reverse (directory-files-recursively doom-core-dir "\\.el$"))))
@@ -475,7 +477,7 @@ take a while."
   (interactive)
   ;; Ensure all relevant config files are loaded. This way we don't need
   ;; eval-when-compile and require blocks scattered all over.
-  (doom-initialize-packages (not noninteractive) noninteractive)
+  (doom-initialize-packages t t)
   (let ((n 0)
         (targets
          (cl-remove-if-not
@@ -484,8 +486,10 @@ take a while."
                   (reverse (directory-files-recursively doom-core-dir "\\.el$"))
                   (reverse (directory-files-recursively doom-modules-dir "\\.el$"))))))
     (dolist (file targets)
-      (when (byte-compile-file file)
+      (when (quiet! (byte-compile-file file))
         (message "+ Recompiling %s" file)
+        (when (assoc (file-truename file) load-history)
+          (ignore-errors (load file nil t)))
         (cl-incf n)))
     (if (= (length targets) 0)
         (message "Nothing to recompile")

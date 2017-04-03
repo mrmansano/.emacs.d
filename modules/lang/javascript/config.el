@@ -31,7 +31,7 @@
   (map! :map js2-mode-map
         :localleader
         :nv ";" 'doom/append-semicolon
-        :n  "s" '+javascript/skewer-this-buffer
+        :n  "S" '+javascript/skewer-this-buffer
 
         :prefix "r"
         :n  "g"  'js2r-add-to-globals-annotation
@@ -101,7 +101,11 @@
 (def-package! rjsx-mode
   :commands rjsx-mode
   :mode "\\.jsx$"
+  :mode "components/.+\\.js$"
   :config
+  ;; disable electric keys (I use snippets and `emmet-mode' instead)
+  (define-key rjsx-mode-map "<" nil)
+  (define-key rjsx-mode-map (kbd "C-d") nil)
   (add-hook! rjsx-mode
     ;; jshint doesn't really know how to deal with jsx
     (push 'javascript-jshint flycheck-disabled-checkers)))
@@ -127,7 +131,6 @@
   :config
   (map! :map skewer-mode-map
         :localleader
-        :n "s" nil
         :n "sE" 'skewer-eval-last-expression
         :n "se" 'skewer-eval-defun
         :n "sf" 'skewer-load-buffer))
@@ -137,7 +140,6 @@
   :config
   (map! :map skewer-css-mode-map
         :localleader
-        :n "s" nil
         :n "se" 'skewer-css-eval-current-declaration
         :n "sr" 'skewer-css-eval-current-rule
         :n "sb" 'skewer-css-eval-buffer
@@ -148,7 +150,6 @@
   :config
   (map! :map skewer-html-mode-map
         :localleader
-        :n "s" nil
         :n "se" 'skewer-html-eval-tag))
 
 
@@ -160,7 +161,7 @@
   :files "gulpfile.js")
 
 (def-project-mode! +javascript-npm-mode
-  :modes (web-mode js2-mode markdown-mode)
+  :modes (html-mode css-mode web-mode js2-mode markdown-mode)
   :files "package.json")
 
 (def-project-mode! +javascript-lb6-mode
