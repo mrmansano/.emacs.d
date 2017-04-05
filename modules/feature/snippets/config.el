@@ -15,7 +15,7 @@
   ;; have additional configuration for yasnippet. For example, file-templates.
   (add-transient-hook! yas-minor-mode-hook (yas-reload-all))
 
-  (add-hook! (text-mode prog-mode snippet-mode markdown-mode org-mode)
+  (add-hook! (text-mode prog-mode snippet-mode)
     'yas-minor-mode-on)
 
   :config
@@ -51,8 +51,8 @@
             [delete]        '+snippets/delete-forward-char-or-field)
 
           (:map yas-minor-mode-map
-            :i [tab] 'yas-expand
-            :v [tab] '+snippets/expand-on-region))
+            :i "<tab>" yas-maybe-expand
+            :v "<tab>" '+snippets/expand-on-region))
 
     ;; Exit snippets on ESC in normal mode
     (advice-add 'evil-force-normal-state :before 'yas-exit-all-snippets)

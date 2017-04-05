@@ -28,9 +28,11 @@
   (set! :electric 'js2-mode :chars '(?\} ?\) ?.) :words '("||" "&&"))
   (set! :xref-backend 'js2-mode 'xref-js2-xref-backend)
 
+  (sp-with-modes '(js2-mode rjsx-mode)
+    (sp-local-pair "/* " " */" :post-handlers '(("| " "SPC"))))
+
   (map! :map js2-mode-map
         :localleader
-        :nv ";" 'doom/append-semicolon
         :n  "S" '+javascript/skewer-this-buffer
 
         :prefix "r"
@@ -102,6 +104,18 @@
   :commands rjsx-mode
   :mode "\\.jsx$"
   :mode "components/.+\\.js$"
+  :init
+  ;; auto-detect JSX file
+  (push (cons (lambda ()
+                (and (equal (file-name-extension buffer-file-name) "js")
+                     (re-search-forward "\\(^\\s-*import React\\|\\( from \\|require(\\)[\"']react\\)"
+                                        magic-mode-regexp-match-limit t)
+                     (progn
+                       (goto-char (match-beginning 1))
+                       (not (sp-point-in-string-or-comment)))))
+              'rjsx-mode)
+        magic-mode-alist)
+
   :config
   ;; disable electric keys (I use snippets and `emmet-mode' instead)
   (define-key rjsx-mode-map "<" nil)

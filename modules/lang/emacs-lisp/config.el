@@ -59,7 +59,15 @@
   :commands auto-compile-on-save-mode
   :config
   (setq auto-compile-display-buffer nil
-        auto-compile-use-mode-line nil))
+        auto-compile-use-mode-line nil)
+  (defun +emacs-lisp*load-after-compile (success)
+    "Reload the current emacs-lisp file after it's recompiled, if an older
+version is loaded."
+    (when (eq success t)
+      (let ((buffer-path (file-truename buffer-file-name)))
+        (when (assoc buffer-path load-history)
+          (load-file buffer-path)))))
+  (advice-add 'auto-compile-byte-compile :filter-return '+emacs-lisp*load-after-compile))
 
 
 (def-package! highlight-quoted
@@ -73,3 +81,11 @@
         slime-complete-symbol*-fancy t
         slime-complete-symbol-function 'slime-fuzzy-complete-symbol))
 
+
+;;
+;;
+;;
+
+(def-project-mode! +emacs-lisp-ert-mode
+  :modes (emacs-lisp-mode)
+  :match "/test-.+\\.el$")

@@ -1,5 +1,4 @@
 ;;; editor.el
-(provide 'doom-lib-editor)
 
 (defun doom--goto-first-non-blank ()
   (beginning-of-visual-line)
@@ -112,7 +111,7 @@ possible, or just one char if that's not possible."
           (setq movement tab-width))
         (save-match-data
           (if (string-match "\\w*\\(\\s-+\\)$"
-                            (buffer-substring-no-properties (- p movement) p))
+                            (buffer-substring-no-properties (max (point-min) (- p movement)) p))
               (delete-char (- 0 (- (match-end 1) (match-beginning 1))))
             (call-interactively 'delete-backward-char)))))
      ;; Otherwise do a regular delete
@@ -155,8 +154,8 @@ from a commented line."
   (cond ((sp-point-in-string)
          (newline))
         ((sp-point-in-comment)
-         (cond ((eq major-mode 'js2-mode)
-                (js2-line-break))
+         (cond ((memq major-mode '(js2-mode rjsx-mode))
+                (call-interactively 'js2-line-break))
                ((memq major-mode '(java-mode php-mode))
                 (c-indent-new-comment-line))
                ((memq major-mode '(c-mode c++-mode objc-mode css-mode scss-mode js2-mode))

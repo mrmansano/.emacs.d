@@ -1,15 +1,20 @@
 ;;; packages.el
-(provide 'doom-lib-packages)
+
+(defvar doom--last-refresh nil)
 
 ;;;###autoload
 (defun doom-refresh-packages ()
   "Refresh ELPA packages."
   (doom-initialize)
   (let ((last-refresh (persistent-soft-fetch 'last-pkg-refresh "emacs")))
-    (when (or (not last-refresh)
-              (> (nth 1 (time-since last-refresh)) 600))
-      (package-refresh-contents)
-      (persistent-soft-store 'last-pkg-refresh (current-time) "emacs"))))
+    (when last-refresh
+      (setq doom--last-refresh last-refresh)))
+  (when (or (not doom--last-refresh)
+            (> (nth 1 (time-since doom--last-refresh)) 600))
+    (package-refresh-contents)
+    (persistent-soft-store
+     'last-pkg-refresh (setq doom--last-refresh (current-time))
+     "emacs")))
 
 ;;;###autoload
 (defun doom-package-backend (name)
@@ -74,11 +79,17 @@ Be careful not to use it in a loop."
                  (append doom-protected-packages (mapcar 'car doom-packages))))))
 
 ;;;###autoload
-(defun doom-get-dependencies-for (name)
+(defun doom-get-depending-on (name)
   "Return a list of packages that depend on the package named NAME."
   (doom-initialize)
   (when-let (desc (cadr (assq name package-alist)))
     (mapcar 'package-desc-name (package--used-elsewhere-p desc nil t))))
+
+;;;###autoload
+(defun doom-get-dependencies-for (name &optional only)
+  "Return a list of dependencies for a package."
+  (doom-initialize)
+  (package--get-deps name only))
 
 ;;;###autoload
 (defun doom-get-outdated-packages ()
@@ -101,9 +112,10 @@ Used by `doom/packages-autoremove'."
 
 ;;;###autoload
 (defun doom-get-missing-packages ()
-  "Return a list of requested packages that aren't installed or built-in. Each
-element is a list whose CAR is the package symbol, and whose CDR is a plist
-taken from that package's `package!' declaration.
+  "Return a list of requested packages that aren't installed or built-in, but
+are enabled (with a `package!' directive). Each element is a list whose CAR is
+the package symbol, and whose CDR is a plist taken from that package's
+`package!' declaration.
 
 Used by `doom/packages-install'."
   (cl-remove-if (lambda (pkgsym)
@@ -125,11 +137,6 @@ Used by `doom/packages-install'."
         (delete-directory path t)))))
 
 ;;; Private functions
-(defsubst doom--version-list-str (vlist)
-  (concat (number-to-string (car vlist))
-          "."
-          (number-to-string (cadr vlist))))
-
 (defsubst doom--sort-alpha (it other)
   (string-lessp (symbol-name (car it))
                 (symbol-name (car other))))
@@ -259,8 +266,8 @@ appropriate."
                                 (lambda (pkg)
                                   (format "+ %s %s -> %s"
                                           (s-pad-right (+ max-len 2) " " (symbol-name (car pkg)))
-                                          (s-pad-right 14 " " (doom--version-list-str (cadr pkg)))
-                                          (doom--version-list-str (cl-caddr pkg))))
+                                          (s-pad-right 14 " " (package-version-join (cadr pkg)))
+                                          (package-version-join (cl-caddr pkg))))
                                 packages
                                 "\n"))))))
            (message "Aborted!"))
@@ -352,8 +359,8 @@ calls."
   (if-let (desc (doom-package-outdated-p (intern package)))
       (if (y-or-n-p (format "%s will be updated from %s to %s. Update?"
                             (car desc)
-                            (doom--version-list-str (cadr desc))
-                            (doom--version-list-str (cl-caddr desc))))
+                            (package-version-join (cadr desc))
+                            (package-version-join (cl-caddr desc))))
           (message "%s %s"
                    (if (doom-update-package package)
                        "Updated"

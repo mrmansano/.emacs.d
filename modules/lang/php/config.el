@@ -20,8 +20,7 @@
   (add-hook! php-mode (setq-local sp-max-pair-length 6))
 
   (sp-with-modes '(php-mode)
-    (sp-local-pair "/*"    "*/" :post-handlers '(("||\n[i]" "RET") ("| " "SPC")))
-    (sp-local-pair "/**"   "*/" :post-handlers '(("||\n[i]" "RET") ("||\n[i]" "SPC")))
+    (sp-local-pair "/* "    "*/" :post-handlers '(("||\n[i] " "RET") ("| " "SPC")))
     (sp-local-pair "<? "    " ?>")
     (sp-local-pair "<?php " " ?>")
     (sp-local-pair "<?="    " ?>")
@@ -30,14 +29,11 @@
 
   (map! :map php-mode-map
         :localleader
-        :nv ";" 'doom/append-semicolon
-
         (:prefix "r"
           :n "cv" 'php-refactor--convert-local-to-instance-variable
           :n "u"  'php-refactor--optimize-use
           :v "xm" 'php-refactor--extract-method
           :n "rv" 'php-refactor--rename-local-variable)
-
         (:prefix "t"
           :n "r" 'phpunit-current-project
           :n "a" 'phpunit-current-class

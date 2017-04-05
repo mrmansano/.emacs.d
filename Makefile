@@ -1,10 +1,10 @@
 # Ensure emacs always runs from this makefile's PWD
 EMACS_FLAGS=--eval "(setq user-emacs-directory default-directory)"
 EMACS=emacs --batch $(EMACS_FLAGS) -l core/core.el
-
+TESTS=$(patsubst %,-l %, $(wildcard test/test-*.el))
 
 # Tasks
-all: install update autoloads
+all: autoloads install update
 
 install: init.el
 	@$(EMACS) -f 'doom-initialize-autoloads' -f 'doom/packages-install'
@@ -32,6 +32,12 @@ clean:
 
 clean-cache:
 	@$(EMACS) -f 'doom/clean-cache'
+
+test: init.el
+	@$(EMACS) -f 'doom-initialize-autoloads' -l ert $(TESTS) -f ert-run-tests-batch-and-exit
+
+test/%: init.el
+	@$(EMACS) -f 'doom-initialize-autoloads' -l ert -l $@.el -f ert-run-tests-batch-and-exit
 
 
 # Syntactic sugar for bootstrapping modules. Allows: make bootstrap javascript
