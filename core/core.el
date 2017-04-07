@@ -8,7 +8,6 @@
 ;;   doom:...   an evil operator, motion or command
 ;;   doom|...   hook function
 ;;   doom*...   advising functions
-;;   doom!...   interaction commands exclusively for installing external dependencies
 ;;   ...!       a macro or function that configures DOOM
 ;;   %...       functions used for in-snippet logic
 ;;   +...       Any of the above, but part of a module, e.g. +emacs-lisp|init-hook
@@ -164,8 +163,8 @@ enable multiple minor modes for the same regexp.")
     (require 'core-keybinds)))  ; centralized keybind system + which-key
 
 (add-hook! 'window-setup-hook
-  (setq gc-cons-threshold 134217728
-        gc-cons-percentage 0.3))
+  (setq gc-cons-threshold 67108864
+        gc-cons-percentage 0.2))
 
 (provide 'core)
 ;;; core.el ends here
