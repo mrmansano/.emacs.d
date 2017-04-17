@@ -6,7 +6,8 @@
   :init
   ;; Auto-detect C++ header files
   (push (cons (lambda ()
-                (and (equal (file-name-extension buffer-file-name) "h")
+                (and buffer-file-name
+                     (equal (file-name-extension buffer-file-name) "h")
                      (or (file-exists-p (expand-file-name
                                          (concat (file-name-sans-extension buffer-file-name)
                                                  ".cpp")))
@@ -18,8 +19,10 @@
         magic-mode-alist)
 
   ;; Auto-detect Obj-C header files
-  (push (cons (lambda () (and (equal (file-name-extension buffer-file-name) "h")
-                         (re-search-forward "@\\<interface\\>" magic-mode-regexp-match-limit t)))
+  (push (cons (lambda ()
+                (and buffer-file-name
+                     (equal (file-name-extension buffer-file-name) "h")
+                     (re-search-forward "@\\<interface\\>" magic-mode-regexp-match-limit t)))
               'objc-mode)
         magic-mode-alist)
 
@@ -27,11 +30,11 @@
   (setq c-tab-always-indent nil
         c-electric-flag nil)
 
-  (add-hook 'c-mode-common-hook 'rainbow-delimiters-mode)
+  (add-hook 'c-mode-common-hook #'rainbow-delimiters-mode)
   ;; extra highlights for numbers in C (`modern-cpp-font-lock' offers something better for C++)
-  (add-hook 'c-mode-hook 'highlight-numbers-mode)
+  (add-hook 'c-mode-hook #'highlight-numbers-mode)
   ;; Fontification of C++11 string literals
-  (add-hook 'c++-mode-hook '+cc|extra-fontify-c++)
+  (add-hook 'c++-mode-hook #'+cc|extra-fontify-c++)
 
   (set! :electric '(c-mode c++-mode objc-mode java-mode)
         :chars '(?\n ?\}))
@@ -48,7 +51,7 @@
     (sp-local-pair "/*!" "*/" :post-handlers '(("||\n[i]" "RET") ("[d-1]< | " "SPC"))))
 
   ;; Improve indentation of inline lambdas in C++11
-  (advice-add 'c-lineup-arglist :around '+c-lineup-arglist)
+  (advice-add #'c-lineup-arglist :around #'+c-lineup-arglist)
 
   ;; C/C++ style settings
   (c-toggle-electric-state -1)
@@ -70,23 +73,23 @@
                 (looking-at "typedef struct"))
             '+
           '++))))
-  (c-set-offset 'inclass '+cc--c-lineup-inclass)
+  (c-set-offset 'inclass #'+cc--c-lineup-inclass)
 
 
   ;; Certain mappings interfere with smartparens and custom bindings,
   ;; so unbind them
   (map! :map c-mode-map
         "DEL" nil
-        "#" 'self-insert-command
-        "{" 'self-insert-command
-        "}" 'self-insert-command
-        "/" 'self-insert-command
-        "*" 'self-insert-command
-        ";" 'self-insert-command
-        "," 'self-insert-command
-        ":" 'self-insert-command
-        "(" 'self-insert-command
-        ")" 'self-insert-command
+        "#" #'self-insert-command
+        "{" #'self-insert-command
+        "}" #'self-insert-command
+        "/" #'self-insert-command
+        "*" #'self-insert-command
+        ";" #'self-insert-command
+        "," #'self-insert-command
+        ":" #'self-insert-command
+        "(" #'self-insert-command
+        ")" #'self-insert-command
 
         :map c++-mode-map
         "}" nil
@@ -97,12 +100,12 @@
         ;; ourselves.
         "<" nil
         :map (c-mode-base-map c++-mode-map)
-        :i ">" '+cc/autoclose->-maybe))
+        :i ">" #'+cc/autoclose->-maybe))
 
 
 (def-package! modern-cpp-font-lock
   :commands modern-c++-font-lock-mode
-  :init (add-hook 'c++-mode-hook 'modern-c++-font-lock-mode))
+  :init (add-hook 'c++-mode-hook #'modern-c++-font-lock-mode))
 
 (def-package! semantic
   :after cc-mode
@@ -125,11 +128,11 @@
   )
 
 (def-package! irony
-  :after semantic
-  :init (add-hook 'c-mode-common-hook 'irony-mode)
+  :after cc-mode
+  :init (add-hook 'c-mode-common-hook #'irony-mode)
   :config
   (setq irony-server-install-prefix (concat doom-etc-dir "irony-server/"))
-  (add-hook! 'irony-mode-hook '(irony-eldoc flycheck-mode))
+  (add-hook! 'irony-mode-hook #'(irony-eldoc flycheck-mode))
   (add-hook! 'c++-mode-hook
     (make-local-variable 'irony-additional-clang-options)
     (push "-std=c++11" irony-additional-clang-options))
@@ -218,4 +221,4 @@
 
 (def-package! demangle-mode
   :commands demangle-mode
-  :init (add-hook 'llvm-mode-hook 'demangle-mode))
+  :init (add-hook 'llvm-mode-hook #'demangle-mode))

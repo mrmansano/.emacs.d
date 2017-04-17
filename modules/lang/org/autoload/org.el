@@ -23,13 +23,23 @@
          (org-indent-item-tree))
         ((org-at-heading-p)
          (ignore-errors (org-demote)))
+        ((org-in-src-block-p t)
+         (doom/dumb-indent))
         (t (call-interactively 'self-insert-command))))
 
 ;;;###autoload
-(defun +org/indent-or-next-field ()
-  "Depending on the context either indent the current item or go the next table field."
+(defun +org/indent-or-next-field-or-yas-expand ()
+  "Depending on the context either a) indent the current line, b) go the next
+table field or c) run `yas-expand'."
   (interactive)
-  (call-interactively (if (org-at-table-p) 'org-table-next-field '+org/indent)))
+  (call-interactively
+   (cond ((and (bound-and-true-p yas-minor-mode)
+               (yas--templates-for-key-at-point))
+          'yas-expand)
+         ((org-at-table-p)
+          'org-table-next-field)
+         (t
+          '+org/indent))))
 
 ;;;###autoload
 (defun +org/dedent ()
@@ -129,8 +139,10 @@ wrong places)."
 ;;;###autoload
 (defun +org/toggle-fold ()
   "Toggle the local fold at the point (as opposed to cycling through all levels
-with `org-cycle')."
+with `org-cycle'). Also removes babel result blocks, if run from a code block."
   (interactive)
+  (org-babel-when-in-src-block
+   (call-interactively 'org-babel-remove-result-one-or-many))
   (cond ((org-at-heading-p)
          (outline-toggle-children))
         ((org-at-item-p)
@@ -169,7 +181,7 @@ fragments, opening links, or refreshing images."
 
      ((eq type 'headline)
       (org-remove-latex-fragment-image-overlays)
-      (org-preview-latex-fragment '(4)))
+      (org-toggle-latex-fragment '(4)))
 
      ((eq type 'babel-call)
       (org-babel-lob-execute-maybe))
@@ -178,7 +190,7 @@ fragments, opening links, or refreshing images."
       (org-babel-execute-src-block))
 
      ((memq type '(latex-fragment latex-environment))
-      (org-preview-latex-fragment))
+      (org-toggle-latex-fragment))
 
      ((eq type 'link)
       (let ((path (org-element-property :path (org-element-lineage context '(link) t))))
@@ -282,3 +294,9 @@ re-align the table if necessary. (Necessary because org-mode has a
       (org-shiftmetadown)
     (org-shiftmetaup)))
 
+;;;###autoload
+(defun +org/edit-special-same-window ()
+  (interactive)
+  (let ((shackle-rules '(("^\\*Org Src" :align t :select t :regexp t :noesc t :same t))))
+    (call-interactively 'org-edit-special)
+    (doom-buffer-mode +1)))

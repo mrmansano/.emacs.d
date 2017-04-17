@@ -1,4 +1,4 @@
-;;; ../test/test-core-lib-package.el
+;;; test/core/autoload/test-package.el
 
 (defun test-package-new (name version &optional reqs)
   (package-desc-create :name name :version version :reqs reqs))
@@ -23,7 +23,7 @@ affects your Emacs packages)."
 ;; Tests
 ;;
 
-(def-test-group! core-lib-package
+(def-test-group! core/autoload/package
   (ert-deftest backend-detection ()
     "TODO"
     (let ((package-alist `((doom-dummy ,(test-package-new 'doom-dummy '(20160405 1234)))))
@@ -53,7 +53,7 @@ affects your Emacs packages)."
           (package-alist
            `((doom-dummy nil)
              (doom-dummy-dep nil)))
-          doom-protected-packages)
+          doom-core-packages)
       (cl-letf (((symbol-function 'doom-initialize-packages) (lambda (&rest _))))
         (should (equal (doom-get-packages) '((doom-dummy)))))))
 
@@ -65,7 +65,7 @@ no longer enabled or depended on."
            `((doom-dummy ,(test-package-new 'doom-dummy '(20160405 1234) '((doom-dummy-dep (1 0)))))
              (doom-dummy-unwanted ,(test-package-new 'doom-dummy-unwanted '(20160601 1234)))
              (doom-dummy-dep ,(test-package-new 'doom-dummy-dep '(20160301 1234)))))
-          doom-protected-packages)
+          doom-core-packages)
       (cl-letf (((symbol-function 'doom-initialize-packages) (lambda (&rest _))))
         (should (equal (doom-get-orphaned-packages) '(doom-dummy-unwanted))))))
 
@@ -74,6 +74,6 @@ no longer enabled or depended on."
 aren't installed."
     (let ((doom-packages '((doom-dummy) (doom-dummy-installed)))
           (package-alist `((doom-dummy-installed ,(test-package-new 'doom-dummy-installed '(20160405 1234)))))
-          doom-protected-packages)
+          doom-core-packages)
       (cl-letf (((symbol-function 'doom-initialize-packages) (lambda (&rest _))))
         (should (equal (doom-get-missing-packages) '((doom-dummy))))))))

@@ -2,8 +2,8 @@
 
 (def-package! gitconfig-mode
   :mode "/\\.?git/?config$"
-  :mode "/\\.gitmodules$"
-  :init (add-hook 'gitconfig-mode-hook 'flyspell-mode))
+  :mode "/\\.gitmodules$")
+
 
 (def-package! gitignore-mode
   :mode "/\\.gitignore$")
@@ -12,16 +12,20 @@
 (def-package! git-gutter-fringe
   :commands git-gutter-mode
   :init
-  (add-hook! (text-mode prog-mode conf-mode) 'git-gutter-mode)
+  (defun +version-control|git-gutter-maybe ()
+    (when (and (buffer-file-name)
+               (not (file-remote-p (buffer-file-name))))
+      (git-gutter-mode +1)))
+  (add-hook! (text-mode prog-mode conf-mode) #'+version-control|git-gutter-maybe)
   :config
   (set! :popup "^\\*git-gutter.+\\*$" :regexp t :size 15 :noselect t)
 
   ;; Update git-gutter on focus (in case I was using git externally)
-  (add-hook 'focus-in-hook 'git-gutter:update-all-windows)
+  (add-hook 'focus-in-hook #'git-gutter:update-all-windows)
 
   (after! evil
     ;; Refreshing git-gutter on ESC
-    (advice-add 'evil-force-normal-state :after 'git-gutter)))
+    (advice-add #'evil-force-normal-state :after #'git-gutter)))
 
 
 (def-package! browse-at-remote

@@ -11,7 +11,7 @@
         js2-mode-show-parse-errors nil)
 
   (add-hook! 'js2-mode-hook
-    '(flycheck-mode highlight-indentation-mode rainbow-delimiters-mode))
+    #'(flycheck-mode highlight-indentation-mode rainbow-delimiters-mode))
 
   ;; Conform switch-case indentation to editorconfig's config
   (add-hook! 'js2-mode-hook (setq js-switch-indent-offset js-indent-level))
@@ -25,7 +25,7 @@
         (setq-local flycheck-javascript-eslint-executable eslint))))
 
   (set! :repl 'js2-mode '+javascript/repl)
-  (set! :electric 'js2-mode :chars '(?\} ?\) ?.) :words '("||" "&&"))
+  (set! :electric 'js2-mode :chars '(?\} ?\) ?.))
   (set! :xref-backend 'js2-mode 'xref-js2-xref-backend)
 
   (sp-with-modes '(js2-mode rjsx-mode)
@@ -86,11 +86,11 @@
 
 (def-package! tern
   :commands tern-mode
-  :init (add-hook 'js2-mode-hook 'tern-mode)
+  :init (add-hook 'js2-mode-hook #'tern-mode)
   :config
   ;; Fix project detection
   (defun +javascript*tern-project-dir (&rest _) (doom-project-root))
-  (advice-add 'tern-project-dir :override '+javascript*tern-project-dir))
+  (advice-add #'tern-project-dir :override #'+javascript*tern-project-dir))
 
 
 (def-package! company-tern
@@ -107,7 +107,8 @@
   :init
   ;; auto-detect JSX file
   (push (cons (lambda ()
-                (and (equal (file-name-extension buffer-file-name) "js")
+                (and buffer-file-name
+                     (equal (file-name-extension buffer-file-name) "js")
                      (re-search-forward "\\(^\\s-*import React\\|\\( from \\|require(\\)[\"']react\\)"
                                         magic-mode-regexp-match-limit t)
                      (progn
@@ -117,6 +118,8 @@
         magic-mode-alist)
 
   :config
+  (set! :electric 'rjsx-mode :chars '(?\} ?\) ?. ?>))
+
   ;; disable electric keys (I use snippets and `emmet-mode' instead)
   (define-key rjsx-mode-map "<" nil)
   (define-key rjsx-mode-map (kbd "C-d") nil)
@@ -133,7 +136,7 @@
 (def-package! web-beautify
   :commands web-beautify-js
   :init
-  (map! :map* (json-mode js2-mode-map) :n "gQ" 'web-beautify-js))
+  (map! :map* (json-mode js2-mode-map) :n "gQ" #'web-beautify-js))
 
 
 ;;
@@ -145,26 +148,26 @@
   :config
   (map! :map skewer-mode-map
         :localleader
-        :n "sE" 'skewer-eval-last-expression
-        :n "se" 'skewer-eval-defun
-        :n "sf" 'skewer-load-buffer))
+        :n "sE" #'skewer-eval-last-expression
+        :n "se" #'skewer-eval-defun
+        :n "sf" #'skewer-load-buffer))
 
-(def-package! skewer-css-mode ; in skewer-mode
+(def-package! skewer-css ; in skewer-mode
   :commands skewer-css-mode
   :config
   (map! :map skewer-css-mode-map
         :localleader
-        :n "se" 'skewer-css-eval-current-declaration
-        :n "sr" 'skewer-css-eval-current-rule
-        :n "sb" 'skewer-css-eval-buffer
-        :n "sc" 'skewer-css-clear-all))
+        :n "se" #'skewer-css-eval-current-declaration
+        :n "sr" #'skewer-css-eval-current-rule
+        :n "sb" #'skewer-css-eval-buffer
+        :n "sc" #'skewer-css-clear-all))
 
-(def-package! skewer-html-mode ; in skewer-mode
+(def-package! skewer-html ; in skewer-mode
   :commands skewer-html-mode
   :config
   (map! :map skewer-html-mode-map
         :localleader
-        :n "se" 'skewer-html-eval-tag))
+        :n "se" #'skewer-html-eval-tag))
 
 
 ;;

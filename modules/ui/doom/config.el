@@ -47,7 +47,8 @@
 
   (defface +doom-folded-face
     `((t (:inherit font-lock-comment-face
-          :background ,(face-background 'default))))
+          :background ,(face-background 'doom-default)
+          :foreground ,(face-foreground 'font-lock-comment-face))))
     "Face to hightlight `hideshow' overlays."
     :group 'doom)
 
@@ -61,14 +62,14 @@
     (when (and (not doom-buffer-mode)
                (doom-real-buffer-p))
       (doom-buffer-mode +1)))
-  (add-hook 'after-change-major-mode-hook '+doom|buffer-mode-on)
+  (add-hook 'after-change-major-mode-hook #'+doom|buffer-mode-on)
 
   (defun +doom|buffer-mode-off ()
     "Disable `doom-buffer-mode' in popup buffers."
     (when (and doom-buffer-mode
                (not (get-buffer-window-list)))
       (doom-buffer-mode -1)))
-  (add-hook 'doom-popup-mode-hook '+doom|buffer-mode-off)
+  (add-hook 'doom-popup-mode-hook #'+doom|buffer-mode-off)
 
   (when (featurep! :feature workspaces)
     (defun +doom|restore-bright-buffers (&rest _)
@@ -76,7 +77,7 @@
       (dolist (buf (persp-buffer-list))
         (with-current-buffer buf
           (+doom|buffer-mode-on))))
-    (add-hook '+workspaces-load-session-hook '+doom|restore-bright-buffers))
+    (add-hook '+workspaces-load-session-hook #'+doom|restore-bright-buffers))
 
   ;; Add file icons to doom-neotree
   (require 'doom-neotree)
@@ -104,9 +105,9 @@
     'doom/blink-cursor)
 
   (after! evil
-    (advice-add 'evil-window-bottom :after 'doom/blink-cursor)
-    (advice-add 'evil-window-middle :after 'doom/blink-cursor)
-    (advice-add 'evil-window-top    :after 'doom/blink-cursor)))
+    (advice-add #'evil-window-bottom :after #'doom/blink-cursor)
+    (advice-add #'evil-window-middle :after #'doom/blink-cursor)
+    (advice-add #'evil-window-top    :after #'doom/blink-cursor)))
 
 
 (after! hideshow

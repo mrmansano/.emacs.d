@@ -2,10 +2,6 @@
 
 (require 'cl-lib)
 
-;;
-(autoload 'when-let "subr-x")
-(autoload 'if-let "subr-x")
-
 ;; I don't use use-package for these to save on the `fboundp' lookups it does
 ;; for its :commands property. I use dolists instead of mapc to avoid extra
 ;; stackframes allocated for lambdas. This is _definitely_ premature
@@ -17,21 +13,14 @@
                persistent-soft-flush persistent-soft-store))
   (autoload sym "persistent-soft"))
 
-(dolist (sym '(s-trim s-trim-left s-trim-right s-chomp s-collapse-whitespace
-               s-word-wrap s-center s-pad-left s-pad-right s-truncate s-left
-               s-right s-chop-suffix s-chop-suffixes s-chop-prefix
-               s-chop-prefixes s-shared-start s-shared-end s-repeat s-concat
-               s-prepend s-append s-lines s-match s-match-strings-all
-               s-matched-positions-all s-slice-at s-split s-split-up-to s-join
-               s-equals? s-less? s-matches? s-blank? s-present? s-ends-with?
-               s-starts-with? s-contains? s-lowercase? s-uppercase? s-mixedcase?
-               s-capitalized? s-numeric? s-replace s-replace-all s-downcase
-               s-upcase s-capitalize s-titleize s-with s-index-of s-reverse
-               s-presence s-format s-lex-format s-count-matches s-wrap
-               s-split-words s-lower-camel-case s-upper-camel-case s-snake-case
-               s-dashed-words s-capitalized-words s-titleized-words
-               s-word-initials))
+(dolist (sym '(s-center s-pad-left s-pad-right s-truncate s-chop-suffix
+               s-chop-suffixes s-chop-prefix s-chop-prefixes s-join s-replace
+               s-replace-all s-capitalize s-titleize s-split-words
+               s-capitalized-words s-titleized-words))
   (autoload sym "s"))
+
+(dolist (sym '(when-let if-let string-trim string-join string-blank-p string-lessp))
+  (autoload sym "subr-x"))
 
 
 ;;
@@ -84,8 +73,8 @@ compilation."
              (if (symbolp feature)
                  (require feature nil :no-error)
                (load feature :no-message :no-error)))
-         'progn
-       'with-no-warnings)
+         #'progn
+       #'with-no-warnings)
     (with-eval-after-load ',feature ,@forms)))
 
 (defmacro quiet! (&rest forms)
@@ -114,10 +103,10 @@ function/hook is first invoked, then it detaches itself."
     `(progn
        (defun ,fn (&rest _)
          ,@forms
-         ,(cond ((functionp hook) `(advice-remove ',hook ',fn))
-                ((symbolp hook) `(remove-hook ',hook ',fn))))
-       ,(cond ((functionp hook) `(advice-add ',hook :before ',fn))
-              ((symbolp hook) `(add-hook ',hook ',fn))))))
+         ,(cond ((functionp hook) `(advice-remove #',hook #',fn))
+                ((symbolp hook) `(remove-hook ',hook #',fn))))
+       ,(cond ((functionp hook) `(advice-add #',hook :before #',fn))
+              ((symbolp hook) `(add-hook ',hook #',fn))))))
 
 (defmacro add-hook! (&rest args)
   "A convenience macro for `add-hook'. Takes, in order:
@@ -151,7 +140,7 @@ Body forms can access the hook's arguments through the let-bound variable
     (let ((hooks (doom--resolve-hooks (pop args)))
           (funcs
            (let ((val (car args)))
-             (if (eq (car-safe val) 'quote)
+             (if (memq (car-safe val) '(quote function))
                  (if (cdr-safe (cadr val))
                      (cadr val)
                    (list (cadr val)))
@@ -159,7 +148,7 @@ Body forms can access the hook's arguments through the let-bound variable
           forms)
       (dolist (fn funcs)
         (setq fn (if (symbolp fn)
-                     `(quote ,fn)
+                     `(function ,fn)
                    `(lambda (&rest args) ,@args)))
         (dolist (hook hooks)
           (push (cond ((eq hook-fn 'remove-hook)
@@ -249,11 +238,11 @@ executed when called with `set!'. FORMS are not evaluated until `set!' calls it.
       (dotimes (i 2) (pop forms)))
     `(push (cons ',name
                  (lambda ()
-                   (cl-flet ((sh (lambda (&rest args) (apply 'doom-sh args)))
-                             (sudo (lambda (&rest args) (apply 'doom-sudo args)))
-                             (fetch (lambda (&rest args) (apply 'doom-fetch args)))
+                   (cl-flet ((sh (lambda (&rest args) (apply #'doom-sh args)))
+                             (sudo (lambda (&rest args) (apply #'doom-sudo args)))
+                             (fetch (lambda (&rest args) (apply #'doom-fetch args)))
                              (message (lambda (&rest args)
-                                        (apply 'message (format "[%s] %s" ,(symbol-name name) (car args))
+                                        (apply #'message (format "[%s] %s" ,(symbol-name name) (car args))
                                                (cdr args)))))
                      (if (not ,(if (not prereqs)
                                    't
@@ -281,7 +270,7 @@ recipes for setting up the external dependencies of a module by, for instance,
 using the OS package manager to install them, or retrieving them from a repo
 using `doom-fetch'."
   (interactive
-   (list (list (completing-read "Bootstrap: " (mapcar 'car doom-bootstraps) nil t))))
+   (list (list (completing-read "Bootstrap: " (mapcar #'car doom-bootstraps) nil t))))
   (let (noninteractive)
     (load "core.el" nil t))
   (doom-initialize-packages t)
@@ -295,7 +284,7 @@ using `doom-fetch'."
               (and err-not-func
                    (message "ERROR: These bootstraps were invalid: %s" err-not-func)))
       (error "There were errors. Aborting."))
-    (mapc 'doom-bootstrap ids)))
+    (mapc #'doom-bootstrap ids)))
 
 (provide 'core-lib)
 ;;; core-lib.el ends here

@@ -3,6 +3,11 @@
 (defconst IS-MAC   (eq system-type 'darwin))
 (defconst IS-LINUX (eq system-type 'gnu/linux))
 
+;; In case this config is shared across multiple computers (like mine are),
+;; let's protect these from autoremoval.
+(push 'exec-path-from-shell doom-protected-packages)
+(push 'osx-clipboard doom-protected-packages)
+
  ;; clipboard
 (setq x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING)
       ;; Use a shared clipboard
@@ -49,7 +54,7 @@
          ;; Most of this code grokked from:
          ;; http://stackoverflow.com/questions/15873346/elisp-rename-macro
          (when (or (featurep 'mac) (featurep 'ns))
-           (advice-add 'evil-visual-update-x-selection :override 'ignore))))
+           (advice-add #'evil-visual-update-x-selection :override #'ignore))))
 
       (IS-LINUX
        ;; nothing yet

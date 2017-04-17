@@ -1,4 +1,4 @@
-;;; extra/tmux/autoload/tmux.el
+;;; tools/tmux/autoload/tmux.el
 
 ;; This library offers:
 ;;   + A way of communicating with a tmux instance
@@ -21,8 +21,8 @@
   (let ((bin (executable-find "tmux")))
     (unless bin
       (error "Could not find tmux executable"))
-    (let* ((args (mapcar 'shell-quote-argument (delq nil args)))
-           (cmdstr (format "%s %s" bin (if args (apply 'format command args) command)))
+    (let* ((args (mapcar #'shell-quote-argument (delq nil args)))
+           (cmdstr (format "%s %s" bin (if args (apply #'format command args) command)))
            (output (get-buffer-create " *tmux stdout*"))
            (errors (get-buffer-create " *tmux stderr*"))
            code)
@@ -46,13 +46,16 @@ but do not execute them."
   (interactive
    (list (read-string "tmux $ ")
          current-prefix-arg))
-  (+tmux (concat "send-keys C-u " command (unless noreturn " Enter"))))
+  (+tmux (concat "send-keys C-u "
+                 (shell-quote-argument command)
+                 (unless noreturn " Enter"))))
 
 ;;;###autoload
-(defun +tmux/send-region (beg end)
+(defun +tmux/send-region (beg end &optional noreturn)
   "Send region to tmux."
-  (interactive "r")
-  (error "Not implemented"))
+  (interactive "rP")
+  (+tmux/run (string-trim (buffer-substring-no-properties beg end))
+             noreturn))
 
 ;;;###autoload
 (defun +tmux/rerun ()
@@ -60,7 +63,7 @@ but do not execute them."
   (interactive "P")
   (unless +tmux-last-command
     (user-error "No last command to run"))
-  (apply '+tmux (car +tmux-last-command) (cdr +tmux-last-command)))
+  (apply #'+tmux (car +tmux-last-command) (cdr +tmux-last-command)))
 
 ;;;###autoload
 (defun +tmux/cd (&optional directory)
@@ -130,7 +133,7 @@ but do not execute them."
                                flags))))
     (if lines
         (mapcar (lambda (it)
-                  (let ((pane (s-split it ";")))
+                  (let ((pane (split-string it ";")))
                     (list (nth 0 pane)
                           :window-id (nth 1 pane)
                           :session-id (nth 2 pane)

@@ -4,9 +4,15 @@
 (defun =rss ()
   "Activate (or switch to) `elfeed' in its workspace."
   (interactive)
-  (+workspace-switch +rss-workspace-name t)
-  (delete-other-windows)
-  (elfeed))
+  (call-interactively 'elfeed))
+
+;;;###autoload
+(defun +rss/quit ()
+  (interactive)
+  (doom-kill-matching-buffers "^\\*elfeed")
+  (dolist (file +rss-elfeed-files)
+    (when-let (buf (get-file-buffer (expand-file-name file +rss-org-dir)))
+      (kill-buffer buf))))
 
 ;;;###autoload
 (defun +rss|elfeed-wrap ()

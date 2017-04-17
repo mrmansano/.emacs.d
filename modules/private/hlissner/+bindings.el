@@ -125,7 +125,9 @@
      :desc "Line numbers"           :n "l" 'doom/toggle-line-numbers
      :desc "Fullscreen"             :n "f" 'doom/toggle-fullscreen
      :desc "Indent guides"          :n "i" 'highlight-indentation-mode
-     :desc "Indent guides (column)" :n "I" 'highlight-indentation-current-column-mode)
+     :desc "Indent guides (column)" :n "I" 'highlight-indentation-current-column-mode
+     :desc "Impatient mode"         :n "h" '+present/impatient-mode
+     :desc "Big mode"               :n "b" '+present/big-mode)
 
    (:desc "Tmux/Terminal"
      :prefix "T"
@@ -174,7 +176,10 @@
      :desc "Browse mode notes"      :n "m"   '+org/browse-notes-for-major-mode
      :desc "Org Capture"            :n "SPC" '+org/capture
      ;; applications
-     :desc "APP: elfeed"            :n "r" '=rss))
+     :desc "APP: elfeed"            :n "r" '=rss
+     :desc "APP: email"             :n "e" '=email
+     :desc "APP: twitter"           :n "t" '=twitter
+     ))
 
  (:localleader
   (:desc "Refactor..." :prefix "r")

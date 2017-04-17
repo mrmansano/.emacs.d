@@ -98,12 +98,12 @@
        :app
        ;; TODO crm             ; org-mode for client relations management
        ;; TODO db              ; Emacs as a database browser
-       ;; TODO email           ; Emacs as an email client
+       email           ; Emacs as an email client
        ;; TODO finance         ; keeping track of my shekels
-       ;; TODO present         ; showing off presentations in emacs
+       present         ; showing off presentations in emacs
        rss             ; emacs as an RSS reader
        ;; TODO stream          ; for streaming code (https://livecoding.tv/vnought)
-       ;; TODO twitter         ; twitter client https://twitter.com/vnought
+       twitter         ; twitter client https://twitter.com/vnought
        write           ; emacs as a word processor (latex + org + markdown)
 
        ;; Private modules are aren't tracked in the repo, except for mine. Use

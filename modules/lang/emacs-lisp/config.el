@@ -3,10 +3,10 @@
 (def-package! elisp-mode ; built-in
   :mode ("/Cask$" . emacs-lisp-mode)
   :init
-  (add-hook 'emacs-lisp-mode-hook '+emacs-lisp|hook)
+  (add-hook 'emacs-lisp-mode-hook #'+emacs-lisp|hook)
 
   :config
-  (set! :repl 'emacs-lisp-mode '+emacs-lisp/repl)
+  (set! :repl 'emacs-lisp-mode #'+emacs-lisp/repl)
   (set! :rotate 'emacs-lisp-mode
         :symbols '(("t" "nil")
                    ("let" "let*")
@@ -21,7 +21,7 @@
 
   (defun +emacs-lisp|hook ()
     (setq mode-name "Elisp") ; [pedantry intensifies]
-    (add-hook 'before-save-hook 'delete-trailing-whitespace nil t)
+    (add-hook 'before-save-hook #'delete-trailing-whitespace nil t)
 
     (eldoc-mode +1)
     (highlight-quoted-mode +1)
@@ -30,7 +30,7 @@
 
     (font-lock-add-keywords
      nil `(;; Display "lambda" as λ
-           ("(\\(lambda\\)" (1 (ignore (compose-region (match-beginning 1) (match-end 1) ?λ 'decompose-region))))
+           ("(\\(lambda\\)" (1 (ignore (compose-region (match-beginning 1) (match-end 1) ?λ #'decompose-region))))
            ;; Highlight doom/module functions
            ("\\(^\\|\\s-\\|,\\)(\\(\\(doom\\|\\+\\)[^) ]+\\)[) \n]" (2 font-lock-builtin-face))))
 
@@ -44,7 +44,7 @@
             ("Modes" "^\\s-*(define-\\(?:global\\(?:ized\\)?-minor\\|generic\\|minor\\)-mode +\\([^ ()\n]+\\)" 1)
             ("Macros" "^\\s-*(\\(?:cl-\\)?def\\(?:ine-compile-macro\\|macro\\) +\\([^ )\n]+\\)" 1)
             ("Inline Functions" "\\s-*(\\(?:cl-\\)?defsubst +\\([^ )\n]+\\)" 1)
-            ("Functions" "^\\s-*(\\(?:cl-\\)?def\\(?:un\\|un\\*\\|method\\|generic\\) +\\([^ )\n]+\\)" 1)
+            ("Functions" "^\\s-*(\\(?:cl-\\)?def\\(?:un\\|un\\*\\|method\\|generic\\|-memoized!\\) +\\([^ )\n]+\\)" 1)
             ("Variables" "^\\s-*(\\(def\\(?:c\\(?:onst\\(?:ant\\)?\\|ustom\\)\\|ine-symbol-macro\\|parameter\\)\\)\\s-+\\(\\(?:\\sw\\|\\s_\\|\\\\.\\)+\\)" 2)
             ("Variables" "^\\s-*(defvar\\(?:-local\\)?\\s-+\\(\\(?:\\sw\\|\\s_\\|\\\\.\\)+\\)[[:space:]\n]+[^)]" 1)
             ("Types" "^\\s-*(\\(cl-def\\(?:struct\\|type\\)\\|def\\(?:class\\|face\\|group\\|ine-\\(?:condition\\|error\\|widget\\)\\|package\\|struct\\|t\\(?:\\(?:hem\\|yp\\)e\\)\\)\\)\\s-+'?\\(\\(?:\\sw\\|\\s_\\|\\\\.\\)+\\)" 2)
@@ -67,7 +67,7 @@ version is loaded."
       (let ((buffer-path (file-truename buffer-file-name)))
         (when (assoc buffer-path load-history)
           (load-file buffer-path)))))
-  (advice-add 'auto-compile-byte-compile :filter-return '+emacs-lisp*load-after-compile))
+  (advice-add #'auto-compile-byte-compile :filter-return #'+emacs-lisp*load-after-compile))
 
 
 (def-package! highlight-quoted
@@ -76,10 +76,8 @@ version is loaded."
 
 (def-package! slime
   :config
-  (setq inferior-lisp-program "clisp"
-        ;; enable fuzzy matching in code buffer and SLIME REPL
-        slime-complete-symbol*-fancy t
-        slime-complete-symbol-function 'slime-fuzzy-complete-symbol))
+  (setq inferior-lisp-program "clisp")
+  (require 'slime-fuzzy))
 
 
 ;;

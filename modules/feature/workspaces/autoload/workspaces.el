@@ -3,12 +3,15 @@
 (defvar +workspace-workspace-file "_workspaces"
   "The file basename in which to store single workspace perspectives.")
 
+(defvar +workspace--last nil)
+
 (defface +workspace-tab-selected-face
   '((((class color) (background light))
      (:background "#333333" :foreground "#000000")) ;; FIXME
     (((class color) (background dark))
      (:background "#51afef" :foreground "#181e26")))
-  "The face for selected tabs displayed by `+workspace/display'")
+  "The face for selected tabs displayed by `+workspace/display'"
+  :group 'doom)
 
 (defface +workspace-tab-face
   '((((class color) (background light))
@@ -17,15 +20,13 @@
      (:background "#23272e" :foreground "#5B6268"))
     (((class color) (background dark))
      (:background "#262626" :foreground "#525252")))
-  "The face for selected tabs displayed by `+workspace/display'")
+  "The face for selected tabs displayed by `+workspace/display'"
+  :group 'doom)
 
 ;;;###autoload
-(defun +workspace-list (&optional exclude-nil-p)
+(defun +workspace-list ()
   "Retrieve a list of names of open workspaces (strings)."
-  (let ((persps (persp-names)))
-    (if exclude-nil-p
-        (delete persp-nil-name persps)
-      persps)))
+  (delete persp-nil-name (persp-names-current-frame-fast-ordered)))
 
 ;;;###autoload
 (defun +workspace-p (obj)
@@ -101,8 +102,8 @@ Return t on success, nil otherwise."
 (defun +workspace-new (name)
   "Create a new workspace named NAME. If one already exists, return nil.
 Otherwise return t on success, nil otherwise."
-  (when (equal name persp-nil-name)
-    (error "Can't create a new %s workspace" name))
+  (when (+workspace-protected-p name)
+    (error "Can't create a new '%s' workspace" name))
   (unless (+workspace-exists-p name)
     (and (persp-add-new name) t)))
 
@@ -110,16 +111,16 @@ Otherwise return t on success, nil otherwise."
 (defun +workspace-rename (name new-name)
   "Rename the current workspace named NAME to NEW-NAME. Returns old name on
 success, nil otherwise."
-  (when (equal name persp-nil-name)
-    (error "Can't rename main workspace"))
+  (when (+workspace-protected-p name)
+    (error "Can't rename '%s' workspace" name))
   (persp-rename new-name (+workspace-get name)))
 
 ;;;###autoload
 (defun +workspace-delete (name &optional inhibit-kill-p)
   "Delete the workspace denoted by TARGET, which can be the name of a
 perspective or its hash table."
-  (when (equal name persp-nil-name)
-    (error "Can't delete main workspace"))
+  (when (+workspace-protected-p name)
+    (error "Can't delete '%s' workspace" name))
   (+workspace-get name) ;; error checking
   (persp-kill name inhibit-kill-p))
 
@@ -130,6 +131,11 @@ perspective or its hash table."
     (if auto-create-p
         (+workspace-new name)
       (error "%s is not an available workspace" name)))
+  (let ((old-name (+workspace-current-name)))
+    (setq +workspace--last
+          (or (and (not (string= old-name persp-nil-name))
+                   old-name)
+              +workspaces-main)))
   (persp-frame-switch name))
 
 (defun +workspace--generate-id ()
@@ -139,6 +145,10 @@ perspective or its hash table."
     (if numbers
         (1+ (car (sort numbers (lambda (it other) (> it other)))))
       1)))
+
+(defun +workspace-protected-p (name)
+  (or (equal name persp-nil-name)
+      (equal name +workspaces-main)))
 
 
 ;;
@@ -233,18 +243,21 @@ workspace to delete."
                            nil nil current-name)
         current-name))))
   (condition-case ex
-      (if (+workspace-delete name)
-          (+workspace-message (format "Deleted '%s' workspace" name) 'success)
-        (error "Couldn't delete %s workspace" name))
+      (if (not (+workspace-delete name))
+          (error "Couldn't delete %s workspace" name)
+        (if (+workspace-exists-p +workspace--last)
+            (+workspace-switch +workspace--last)
+          (+workspace-switch +workspaces-main t))
+        (+workspace-message (format "Deleted '%s' workspace" name) 'success))
     ('error (+workspace-error (cadr ex) t))))
 
 ;;;###autoload
 (defun +workspace/kill-session ()
   "Delete the current session, clears all workspaces, windows and buffers."
   (interactive)
-  (unless (cl-every '+workspace-delete (+workspace-list t))
+  (unless (cl-every '+workspace-delete (delete +workspaces-main (+workspace-list)))
     (+workspace-error "Could not clear session"))
-  (+workspace-switch persp-nil-name)
+  (+workspace-switch +workspaces-main t)
   (doom/kill-all-buffers)
   (let ((fallback-buf (doom-fallback-buffer)))
     (switch-to-buffer fallback-buf)
@@ -267,7 +280,7 @@ pre-existing workspace."
       (let ((exists-p (+workspace-exists-p name)))
         (if exists-p
             (error "%s already exists" name)
-          (persp-frame-switch name)
+          (+workspace-switch name t)
           (if clone-p
               (dolist (window (window-list))
                 (persp-add-buffer (window-buffer window) persp nil))
@@ -293,11 +306,13 @@ end of the workspace list."
                (let ((dest (nth index names)))
                  (unless dest
                    (error "No workspace at #%s" (1+ index)))
-                 (persp-switch dest)))
+                 (+workspace-switch dest)))
               ((stringp index)
                (unless (member index names)
                  (error "No workspace named %s" index))
-               (persp-frame-switch index)))
+               (+workspace-switch index))
+              (t
+               (error "Not a valid index: %s" index)))
         (unless (called-interactively-p 'interactive)
           (if (equal (+workspace-current-name) old-name)
               (+workspace-message (format "Already in %s" old-name) 'warn)
@@ -314,15 +329,26 @@ end of the workspace list."
 (defun +workspace/cycle (n)
   "Cycle n workspaces to the right (default) or left."
   (interactive (list 1))
-  (condition-case ex
-      (let ((persp-switch-wrap t))
-        (dotimes (i n)
-          (if (> n 0)
-              (persp-next)
-            (persp-prev)))
-        (unless (called-interactively-p 'interactive)
-          (+workpace/display)))
-    ('error (+workspace-error (cadr ex) t))))
+  (let ((current-name (+workspace-current-name)))
+    (if (equal current-name persp-nil-name)
+        (+workspace-switch +workspaces-main t)
+      (condition-case ex
+          (let* ((persps (+workspace-list))
+                 (perspc (length persps))
+                 (index (cl-position current-name persps)))
+            (when (= perspc 1)
+              (user-error "No other workspaces"))
+            (+workspace/switch-to (% (+ index n) perspc))
+            (unless (called-interactively-p 'interactive)
+              (+workspace/display)))
+        ('user-error (+workspace-error (cadr ex) t))
+        ('error (+workspace-error ex t))))))
+
+;;;###autoload
+(defun +workspace/switch-left ()  (interactive) (+workspace/cycle -1))
+
+;;;###autoload
+(defun +workspace/switch-right () (interactive) (+workspace/cycle +1))
 
 ;;;###autoload
 (defun +workspace/close-window-or-workspace ()
@@ -332,7 +358,7 @@ the workspace and move to the next."
   (if (doom-popup-p)
       (doom/popup-close)
     (let ((current-persp-name (+workspace-current-name)))
-      (cond ((or (equal current-persp-name persp-nil-name)
+      (cond ((or (+workspace-protected-p current-persp-name)
                  (> (length (doom-visible-windows)) 1))
              (if (bound-and-true-p evil-mode)
                  (evil-window-delete)
@@ -350,7 +376,7 @@ the workspace and move to the next."
         (current-name (+workspace-current-name))
         (i 0))
     (mapconcat
-     'identity
+     #'identity
      (mapcar (lambda (it)
                (cl-incf i)
                (propertize (format " [%d] %s " i it)
@@ -378,7 +404,7 @@ the workspace and move to the next."
 ;;;###autoload
 (defun +workspace-error (message &optional noerror)
   "Show an 'elegant' error in the echo area next to a listing of workspaces."
-  (funcall (if noerror 'message 'error) "%s" (+workspace--message-body message 'error)))
+  (funcall (if noerror #'message #'error) "%s" (+workspace--message-body message 'error)))
 
 ;;;###autoload
 (defun +workspace/display ()

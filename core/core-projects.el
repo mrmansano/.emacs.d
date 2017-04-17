@@ -37,6 +37,14 @@ state are passed in.")
                   ("html" "jade" "pug" "jsx" "tsx"))
                 projectile-other-file-alist))
 
+  ;; Projectile root-searching functions cause an endless loop on TRAMP
+  ;; connections, so we disable them.
+  (defun doom*projectile-locate-dominating-file (orig-fn &rest args)
+    "Don't traverse the file system if a remote connection."
+    (unless (file-remote-p default-directory)
+      (apply orig-fn args)))
+  (advice-add #'projectile-locate-dominating-file :around #'doom*projectile-locate-dominating-file)
+
   (defun doom*projectile-cache-current-file (orig-fun &rest args)
     "Don't cache ignored files."
     (unless (cl-some (lambda (path)
@@ -44,7 +52,7 @@ state are passed in.")
                                         (expand-file-name path)))
                      (projectile-ignored-directories))
       (apply orig-fun args)))
-  (advice-add 'projectile-cache-current-file :around 'doom*projectile-cache-current-file))
+  (advice-add #'projectile-cache-current-file :around #'doom*projectile-cache-current-file))
 
 
 ;;
@@ -80,7 +88,7 @@ unless the path begins with ./ or ../, in which case it's relative to
 .dir-locals.el files."
   (dolist (mode doom-project)
     (funcall mode)))
-(add-hook 'after-change-major-mode-hook 'doom|autoload-project-mode)
+(add-hook 'after-change-major-mode-hook #'doom|autoload-project-mode)
 
 (defmacro def-project-mode! (name &rest plist)
   "Define a project minor-mode named NAME, and declare where and how it is
