@@ -133,28 +133,12 @@ for :align t on every rule."
   :init-value nil
   :keymap doom-popup-mode-map
   (let ((window (selected-window)))
-    ;; Major mode changes (and other things) may call
-    ;; `kill-all-local-variables', turning off things like `doom-popup-mode'.
-    ;; This prevents that.
-    (put 'doom-popup-mode 'permanent-local doom-popup-mode)
     ;; Ensure that buffer-opening functions/commands (like
     ;; `switch-to-buffer-other-window' won't use this window).
     (set-window-parameter window 'no-other-window doom-popup-mode)
     ;; Makes popup window resist interactively changing its buffer.
     (set-window-dedicated-p window doom-popup-mode)
     (cond (doom-popup-mode
-           ;; Don't show modeline in popup windows without a :modeline rule. If
-           ;; one exists and it's a symbol, use `doom-modeline' to grab the
-           ;; format. If non-nil, show the mode-line as normal. If nil (or
-           ;; omitted, by default), then hide the modeline entirely.
-           (let ((modeline (plist-get doom-popup-rules :modeline)))
-             (unless (eq modeline 't)
-               (cond ((or (eq modeline 'nil)
-                          (not modeline))
-                      (doom-hide-modeline-mode +1))
-                     ((symbolp modeline)
-                      (let ((doom--hidden-modeline-format (doom-modeline modeline)))
-                        (doom-hide-modeline-mode +1))))))
            ;; Save metadata into window parameters so it can be saved by window
            ;; config persisting plugins like workgroups or persp-mode.
            (set-window-parameter window 'popup (or doom-popup-rules t))
@@ -164,16 +148,33 @@ for :align t on every rule."
                  (set-window-parameter window param val)))))
 
           (t
-           ;; show modeline
-           (when doom-hide-modeline-mode
-             (doom-hide-modeline-mode -1))
            ;; Ensure window parameters are cleaned up
            (set-window-parameter window 'popup nil)
            (dolist (param doom-popup-window-parameters)
              (set-window-parameter window param nil))))))
 
-;; Hide modeline in completion popups
-(add-hook 'completion-list-mode-hook #'doom-hide-modeline-mode)
+;; Major mode changes (and other things) may call `kill-all-local-variables',
+;; turning off things like `doom-popup-mode'. This prevents that.
+(put 'doom-popup-mode 'permanent-local t)
+(put 'doom-popup-rules 'permanent-local t)
+
+;; Don't show modeline in popup windows without a :modeline rule. If
+;; one exists and it's a symbol, use `doom-modeline' to grab the
+;; format. If non-nil, show the mode-line as normal. If nil (or
+;; omitted, by default), then hide the modeline entirely.
+(add-hook! 'doom-popup-mode-hook
+  (if doom-popup-mode
+      (let ((modeline (plist-get doom-popup-rules :modeline)))
+        (cond ((or (eq modeline 'nil)
+                   (not modeline))
+               (doom-hide-modeline-mode +1))
+              ((and (symbolp modeline)
+                    (not (eq modeline 't)))
+               (let ((doom--mode-line (doom-modeline modeline)))
+                 (doom-hide-modeline-mode +1)))))
+    ;; show modeline
+    (when doom-hide-modeline-mode
+      (doom-hide-modeline-mode -1))))
 
 ;;
 (defun doom*popup-init (orig-fn &rest args)
@@ -247,7 +248,8 @@ properties."
   (defun doom*popup-close-all-maybe ()
     "Close popups with an :autoclose property when pressing ESC from normal
 mode in any evil-mode buffer."
-    (unless (or (minibuffer-window-active-p (minibuffer-window))
+    (unless (or (doom-popup-p)
+                (minibuffer-window-active-p (minibuffer-window))
                 (and (bound-and-true-p evil-mode)
                      (evil-ex-hl-active-p 'evil-ex-search)))
       (doom/popup-close-all)))
@@ -380,6 +382,18 @@ the command buffer."
 
 (after! twittering-mode
   (setq twittering-pop-to-buffer-function #'pop-to-buffer))
+
+
+(after! xref
+  (advice-add 'xref-goto-xref :around '+jump*xref-goto-xref)
+  (defun +jump*xref-goto-xref (orig-fn &rest args)
+    "Jump to the xref on the current line, select its window and close the popup
+you came from."
+    (interactive)
+    (let ((popup-p (doom-popup-p))
+          (window (selected-window)))
+      (apply orig-fn args)
+      (when popup-p (doom/popup-close window)))))
 
 
 ;; Ensure these settings are attached to org-load-hook as late as possible,
