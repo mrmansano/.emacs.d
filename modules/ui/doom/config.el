@@ -4,11 +4,11 @@
   "The color theme currently in use.")
 
 (defvar +doom-font
-  (font-spec :name "Source Code Pro:pixelsize=12:foundry=ADBO:weight=semi-bold:slant=normal:width=normal:spacing=100:scalable=true")
+  (font-spec :family "Fira Mono" :size 12)
   "The font currently in use.")
 
 (defvar +doom-variable-pitch-font
-  (font-spec :name "Fira Sans Medium" :size 13)
+  (font-spec :family "Fira Sans" :size 14)
   "The font currently in use.")
 
 (defvar +doom-unicode-font
@@ -43,7 +43,11 @@
   :config
   (load-theme +doom-theme t)
 
-  (setq doom-enable-bold nil)
+  ;; Since Fira Mono doesn't have an italicized variant, highlight it instead
+  (set-face-attribute 'italic nil
+                      :weight 'ultra-light
+                      :foreground "#ffffff"
+                      :background (face-background 'doom-hl-line))
 
   (defface +doom-folded-face
     `((t (:inherit font-lock-comment-face
@@ -53,8 +57,9 @@
     :group 'doom)
 
   ;; Dark frames by default
-  (push (cons 'background-color (face-background 'default)) default-frame-alist)
-  (push (cons 'foreground-color (face-foreground 'default)) default-frame-alist)
+  (when (display-graphic-p)
+    (push (cons 'background-color (face-background 'default)) default-frame-alist)
+    (push (cons 'foreground-color (face-foreground 'default)) default-frame-alist))
 
   (defun +doom|buffer-mode-on ()
     "Enable `doom-buffer-mode' in buffers that are real (see
@@ -82,7 +87,7 @@
   ;; Add file icons to doom-neotree
   (require 'doom-neotree)
   (setq doom-neotree-enable-variable-pitch t
-        doom-neotree-file-icons t
+        doom-neotree-file-icons 'simple
         doom-neotree-line-spacing 3)
 
   ;; Add line-highlighting to nlinum

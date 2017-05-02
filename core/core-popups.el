@@ -59,7 +59,7 @@ is enabled/disabled.'")
         ;;              `doom*delete-popup-window'
         ;;  :autoclose  If non-nil, close popup if ESC is pressed from any buffer.
         shackle-rules
-        '(("^ ?\\*doom:.+\\*$"      :size 40  :modeline t :regexp t)
+        '(("^ ?\\*doom:.+\\*$"      :size 25  :modeline minimal :regexp t :noesc t)
           ("^ ?\\*doom .+\\*$"      :size 10  :noselect t :regexp t)
           ("^ *doom message*"       :size 10  :noselect t :autokill t)
           ("*Metahelp*"             :size 0.5 :autokill t :autoclose t)
@@ -85,7 +85,10 @@ is enabled/disabled.'")
           (tabulated-list-mode      :noesc t)))
 
   :config
-  (shackle-mode 1)
+  (if (display-graphic-p)
+      (shackle-mode +1)
+    (add-transient-hook! 'after-make-frame-functions (shackle-mode +1))
+    (add-hook 'after-init-hook 'shackle-mode))
 
   (defun doom*shackle-always-align (plist)
     "Ensure popups are always aligned and selected by default. Eliminates the need
@@ -170,7 +173,8 @@ for :align t on every rule."
                (doom-hide-modeline-mode +1))
               ((and (symbolp modeline)
                     (not (eq modeline 't)))
-               (let ((doom--mode-line (doom-modeline modeline)))
+               (setq-local doom--modeline-format (doom-modeline modeline))
+               (when doom--modeline-format
                  (doom-hide-modeline-mode +1)))))
     ;; show modeline
     (when doom-hide-modeline-mode
@@ -412,7 +416,7 @@ you came from."
       '("*Org Clock*"        :noselect t)
       '("^\\*Org Src"        :regexp t :size 0.5 :noesc t)
       '("*Edit Formulas*"    :size 10)
-      '("^\\*Org-Babel"      :regexp t :size 0.4)
+      '("^\\*Org-Babel"      :regexp t :size 25 :noselect t)
       '("^CAPTURE.*\\.org$"  :regexp t :size 20))
 
     ;; Org tries to do its own popup management, causing buffer/window config
@@ -426,7 +430,6 @@ you came from."
             (apply orig-fn args)
           (advice-remove #'delete-other-windows #'silence))))
     (advice-add #'org-capture-place-template :around #'doom*suppress-delete-other-windows)
-    (advice-add #'org-agenda :around #'doom*suppress-delete-other-windows)
     (advice-add #'org-add-log-note :around #'doom*suppress-delete-other-windows)
     (advice-add #'org-export--dispatch-ui :around #'doom*suppress-delete-other-windows)
 
@@ -459,7 +462,11 @@ you came from."
     (add-hook 'org-agenda-finalize-hook #'doom-hide-modeline-mode)
 
     (after! org-agenda
-      (setq org-agenda-window-setup 'other-window)
+      (setq org-agenda-window-setup 'other-window
+            org-agenda-restore-windows-after-quit nil)
+
+      (advice-add #'org-agenda :around #'doom*suppress-delete-other-windows)
+
       (after! evil
         (map! :map* org-agenda-mode-map
               :m [escape] 'org-agenda-Quit

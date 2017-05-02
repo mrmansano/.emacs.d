@@ -12,7 +12,7 @@
        (defun ,def-name ()
          (require 'company)
          (setq-local company-backends (append '((,@backends)) company-backends)))
-       (add-hook! ,modes ',def-name))))
+       (add-hook! ,modes #',def-name))))
 
 
 ;;
@@ -63,6 +63,10 @@
           "C-p"        #'company-search-repeat-backward
           "C-s"        (λ! (company-search-abort) (company-filter-candidates))
           [escape]     #'company-search-abort))
+
+  ;; TAB auto-completion in term buffers
+  (after! comint
+    (map! :map comint-mode-map [tab] #'company-complete))
 
   (global-company-mode +1))
 

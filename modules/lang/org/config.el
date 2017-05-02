@@ -30,6 +30,7 @@
 (when-let (path (locate-library "org" nil doom--package-load-path))
   (push (file-name-directory path) load-path))
 
+(load! +agenda)
 (load! +attach)
 (load! +capture)
 (load! +export)
@@ -43,25 +44,33 @@
 
 (defun +org|hook ()
   "Run everytime `org-mode' is enabled."
-  (evil-org-mode +1)
-  (visual-line-mode +1)
   (setq line-spacing 1)
 
-  ;; If saveplace places the point in a folded position, unfold it on load
-  (when (outline-invisible-p)
-    (ignore-errors
-      (save-excursion
-        (outline-previous-visible-heading 1)
-        (org-show-subtree))))
+  (visual-line-mode +1)
+  (when (and (featurep 'evil) evil-mode)
+    (evil-org-mode +1))
 
-  ;; auto-align tables
+  (unless org-agenda-inhibit-startup
+    ;; My version of the 'overview' #+STARTUP option: expand first-level
+    ;; headings.
+    (when (eq org-startup-folded t)
+      (outline-hide-sublevels 2))
+
+    ;; If saveplace places the point in a folded position, unfold it on load
+    (when (outline-invisible-p)
+      (ignore-errors
+        (save-excursion
+          (outline-previous-visible-heading 1)
+          (org-show-subtree)))))
+
   (defun +org|realign-table-maybe ()
+    "Auto-align table under cursor."
     (when (org-at-table-p)
       (org-table-align)))
   (add-hook 'evil-insert-state-exit-hook #'+org|realign-table-maybe nil t)
 
   (defun +org|update-cookies ()
-    "Update counts on headlines (\"cookies\")."
+    "Update counts in headlines (aka \"cookies\")."
     (when (and buffer-file-name (file-exists-p buffer-file-name))
       (org-update-statistics-cookies t)))
 
@@ -78,29 +87,43 @@
     :keymap (make-sparse-keymap)
     :group 'evil-org)
 
+  (define-minor-mode +org-pretty-mode
+    "TODO"
+    :init-value nil
+    :lighter " *"
+    :group 'evil-org
+    (setq org-hide-emphasis-markers +org-pretty-mode)
+    (org-toggle-pretty-entities)
+    ;; In case the above un-align tables
+    (org-table-map-tables 'org-table-align t))
+
   (setq-default
    org-export-coding-system 'utf-8
+   org-todo-keywords '((sequence "[ ](t)" "[-](p)" "[?](m)" "|" "[X](d)")
+                       (sequence "TODO(T)" "|" "DONE(D)")
+                       (sequence "IDEA(i)" "NEXT(n)" "ACTIVE(a)" "WAITING(w)" "LATER(l)" "|" "CANCELLED(c)"))
 
    ;; Appearance
    outline-blank-line t
    org-indent-mode-turns-on-hiding-stars t
    org-adapt-indentation nil
-   org-blank-before-new-entry '((heading . nil) (plain-list-item . auto))
    org-cycle-separator-lines 1
    org-cycle-include-plain-lists t
-   org-ellipsis " ... "
-   org-entities-user '(("flat" "\\flat" nil "" "" "266D" "♭")
+   ;; org-ellipsis " ... "
+   org-ellipsis "  "
+   org-entities-user '(("flat"  "\\flat" nil "" "" "266D" "♭")
                        ("sharp" "\\sharp" nil "" "" "266F" "♯"))
    org-fontify-done-headline t
    org-fontify-quote-and-verse-blocks t
    org-fontify-whole-heading-line t
    org-footnote-auto-label 'plain
-   org-hide-emphasis-markers t
+   org-hide-emphasis-markers nil
    org-hide-leading-stars t
    org-hide-leading-stars-before-indent-mode t
+   org-hidden-keywords nil
    org-image-actual-width nil
    org-indent-indentation-per-level 2
-   org-pretty-entities t
+   org-pretty-entities nil
    org-pretty-entities-include-sub-superscripts t
    org-startup-folded t
    org-startup-indented t
@@ -109,16 +132,14 @@
    org-use-sub-superscripts '{}
 
    ;; Behavior
+   org-blank-before-new-entry '((heading . nil) (plain-list-item . auto))
    org-catch-invisible-edits 'show
    org-checkbox-hierarchical-statistics nil
-   org-completion-use-ido nil ; Use ivy/counsel for refiling
+   org-enforce-todo-checkbox-dependencies nil
    org-confirm-elisp-link-function nil
    org-default-priority ?C
-   org-hidden-keywords '(title)
    org-hierarchical-todo-statistics t
-   org-log-done t
    org-loop-over-headlines-in-active-region t
-   org-outline-path-complete-in-steps nil
    org-refile-use-outline-path t
    org-special-ctrl-a/e t
 
@@ -126,29 +147,7 @@
    org-archive-location (concat +org-dir "/archived/%s::")
    org-refile-targets '((nil . (:maxlevel . 2))) ; display full path in refile completion
 
-   ;; Agenda
-   diary-file (concat doom-local-dir "diary.org")
-   ;; calendar-mark-diary-entries-flag nil
-   org-agenda-restore-windows-after-quit nil
-   org-agenda-skip-unavailable-files nil
-   org-agenda-dim-blocked-tasks nil
-   org-agenda-window-setup 'other-frame ; to get org-agenda to behave with shackle...
-   org-agenda-inhibit-startup t
-   org-agenda-files (directory-files +org-dir t "\\.org$" t)
-   org-todo-keywords '((sequence "[ ](t)" "[-](p)" "[?](m)" "|" "[X](d)")
-                       (sequence "TODO(T)" "|" "DONE(D)")
-                       (sequence "IDEA(i)" "NEXT(n)" "ACTIVE(a)" "WAITING(w)" "LATER(l)" "|" "CANCELLED(c)"))
-
-
    ;; Latex
-   org-format-latex-options
-   (plist-put org-format-latex-options :scale 1.5)
-   org-format-latex-options
-   (plist-put org-format-latex-options
-              :background (face-attribute (or (cadr (assq 'default face-remapping-alist))
-                                              'default)
-                                          :background nil t))
-
    org-highlight-latex-and-related '(latex)
    org-latex-create-formula-image-program 'dvipng
    org-latex-image-default-width ".9\\linewidth"
@@ -160,6 +159,24 @@
    ;;   ("" "physics" t) TODO Install this)
    )
 
+  ;; LaTeX previews are too small and usually render to light backgrounds, so
+  ;; this enlargens them and ensures their background (and foreground) match the
+  ;; current theme.
+  (setq-default
+   org-format-latex-options
+   (plist-put org-format-latex-options :scale 1.5)
+   org-format-latex-options
+   (plist-put org-format-latex-options
+              :background (face-attribute (or (cadr (assq 'default face-remapping-alist))
+                                              'default)
+                                          :background nil t)))
+
+  ;; Use ivy/helm if either is available
+  (when (or (featurep! :completion ivy)
+            (featurep! :completion helm))
+    (setq-default org-completion-use-ido nil
+                  org-outline-path-complete-in-steps nil))
+
   (let ((ext-regexp (regexp-opt '("GIF" "JPG" "JPEG" "SVG" "TIF" "TIFF" "BMP" "XPM"
                                   "gif" "jpg" "jpeg" "svg" "tif" "tiff" "bmp" "xpm"))))
     (setq iimage-mode-image-regex-alist
@@ -167,14 +184,22 @@
                       ext-regexp "\\)\\(\\]\\]\\|>\\|'\\)?") . 2)
             (,(concat "<\\(http://.+\\." ext-regexp "\\)>") . 1))))
 
-  ;; Fontify checkboxes and dividers
-  (defface org-list-bullet
-    '((t (:inherit font-lock-keyword-face)))
-    "Face for list bullets"
-    :group 'doom)
+  ;;; Custom fontification
+  ;; I like how org-mode fontifies checked TODOs and want this to extend to
+  ;; checked checkbox items, so we remove the old checkbox highlight rule...
+  (font-lock-remove-keywords
+   'org-mode '(("^[ \t]*\\(?:[-+*]\\|[0-9]+[.)]\\)[ \t]+\\(?:\\[@\\(?:start:\\)?[0-9]+\\][ \t]*\\)?\\(\\[[- X]\\]\\)"
+                1 'org-checkbox prepend)))
   (font-lock-add-keywords
-   'org-mode '(("^ *\\([-+]\\|[0-9]+[).]\\) " (1 'org-list-bullet))
-               ("^ *\\(-----+\\)$" (1 'org-meta-line))))
+   'org-mode '(;; ...and replace it with my own
+               ("^[ \t]*\\(?:[-+*]\\|[0-9]+[).]\\)[ \t]+\\(\\(?:\\[@\\(?:start:\\)?[0-9]+\\][ \t]*\\)?\\[\\(?:X\\|\\([0-9]+\\)/\\2\\)\\][^\n]*\n\\)"
+                1 'org-headline-done t)
+               ("^[ \t]*\\(?:[-+*]\\|[0-9]+[.)]\\)[ \t]+\\(?:\\[@\\(?:start:\\)?[0-9]+\\][ \t]*\\)?\\(\\[[- ]\\]\\)"
+                1 'org-checkbox append)
+               ;; Also highlight list bullets
+               ("^ *\\([-+]\\|[0-9]+[).]\\) " 1 'org-list-dt append)
+               ;; and separators
+               ("^ *\\(-----+\\)$" 1 'org-meta-line)))
 
   ;; Enable gpg support
   (require 'epa-file)
@@ -192,8 +217,13 @@
     (sp-local-pair "$$" "$$"   :post-handlers '((:add " | ")) :unless '(sp-point-at-bol-p))
     (sp-local-pair "{" nil))
 
-  ;; bullets
-  (def-package! org-bullets :commands org-bullets-mode)
+  ;; The standard unicode characters are usually misaligned depending on the
+  ;; font. This bugs me. Personally, the markdown #-marks for headlines are more
+  ;; elegant, so use those.
+  (def-package! org-bullets
+    :commands org-bullets-mode
+    :init (add-hook 'org-mode-hook 'org-bullets-mode)
+    :config (setq org-bullets-bullet-list '("#")))
 
   ;; Keybinds
   (map! (:map org-mode-map
@@ -313,16 +343,7 @@
           :v  "<"   (λ! (org-metaleft)  (evil-visual-restore))
           :v  ">"   (λ! (org-metaright) (evil-visual-restore))
           :n  "-"   #'org-cycle-list-bullet
-          :m  "<tab>" #'org-cycle)
-
-        (:after org-agenda
-          (:map org-agenda-mode-map
-            :e "<escape>" #'org-agenda-Quit
-            :e "m"   #'org-agenda-month-view
-            :e "C-j" #'org-agenda-next-item
-            :e "C-k" #'org-agenda-previous-item
-            :e "C-n" #'org-agenda-next-item
-            :e "C-p" #'org-agenda-previous-item)))
+          :m  "<tab>" #'org-cycle))
 
   ;; Initialize everything else
   (run-hooks '+org-init-hook)
@@ -339,13 +360,6 @@
         `(("\\.org$" . emacs)
           (t . ,(cond (IS-MAC "open -R \"%s\"")
                       (IS-LINUX "xdg-open \"%s\"")))))
-
-  ;; Don't clobber recentf with agenda files
-  (defun +org-is-agenda-file (filename)
-    (cl-find (file-truename filename) org-agenda-files
-             :key #'file-truename
-             :test #'equal))
-  (add-to-list 'recentf-exclude #'+org-is-agenda-file)
 
   ;; Remove highlights on ESC
   (defun +org*remove-occur-highlights (&rest args)

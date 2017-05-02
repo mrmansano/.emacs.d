@@ -49,7 +49,7 @@
 (add-hook! isearch-mode-end (setq echo-keystrokes 0.02))
 
 ;; A minor mode for toggling the mode-line
-(defvar doom--modeline-format nil
+(defvar-local doom--modeline-format nil
   "The modeline format to use when `doom-hide-modeline-mode' is active. Don't
 set this directly. Bind it in `let' instead.")
 (defvar-local doom--old-modeline-format nil
@@ -66,6 +66,7 @@ disabled.")
           doom--old-modeline-format nil))
   (force-mode-line-update))
 ;; Ensure major-mode or theme changes don't overwrite these variables
+(put 'doom--modeline-format 'permanent-local t)
 (put 'doom--old-modeline-format 'permanent-local t)
 (put 'doom-hide-modeline-mode 'permanent-local t)
 
@@ -164,7 +165,7 @@ file."
     nil)
 
   (add-hook! (highlight-indentation-mode highlight-indentation-current-column-mode)
-    (if highlight-indentation-mode
+    (if (or highlight-indentation-mode highlight-indentation-current-column-mode)
         (progn
           (doom|inject-trailing-whitespace)
           (add-hook 'before-save-hook #'delete-trailing-whitespace nil t)
@@ -256,7 +257,7 @@ Example:
   (def-modeline! minimal
     (bar matches \" \" buffer-info)
     (media-info major-mode))
-  (setq-default mode-line-format (doom-modeline 'minimal))"
+  (doom-set-modeline 'minimal t)"
   (let ((sym (intern (format "doom-modeline-format--%s" name)))
         (lhs-forms (doom--prepare-modeline-segments lhs))
         (rhs-forms (doom--prepare-modeline-segments rhs)))
@@ -278,9 +279,18 @@ Example:
   "Returns a mode-line configuration associated with KEY (a symbol). Throws an
 error if it doesn't exist."
   (let ((fn (intern (format "doom-modeline-format--%s" key))))
-    (unless (functionp fn)
-      (error "Modeline format doesn't exist: %s" key))
-    `(:eval (,fn))))
+    (when (functionp fn)
+      `(:eval (,fn)))))
+
+(defun doom-set-modeline (key &optional default)
+  "Set the modeline format. Does nothing if the modeline KEY doesn't exist. If
+DEFAULT is non-nil, set the default mode-line for all buffers."
+  (let ((modeline (doom-modeline key)))
+    (when modeline
+      (setf (if default
+                (default-value 'mode-line-format)
+              (buffer-local-value 'mode-line-format (current-buffer)))
+            modeline))))
 
 (provide 'core-ui)
 ;;; core-ui.el ends here

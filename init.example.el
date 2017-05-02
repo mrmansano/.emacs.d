@@ -79,7 +79,6 @@
        latex           ; writing papers in Emacs has never been so fun
        lua             ; one-based indices? one-based indices
        markdown        ; writing docs for people to ignore
-       octave          ; math isn't a choice, it's a way of life
        org             ; for organized fearless leader (WIP)
        php             ; make php less awful to work with
        python          ; beautiful is better than ugly
@@ -95,10 +94,10 @@
        ;; Applications are opinionated modules that transform Emacs to fulfill a
        ;; specific purpose. They should be loaded last.
        :app
-       ;; TODO crm             ; org-mode for client relations management
-       ;; TODO db              ; Emacs as a database browser
+       ;; TODO crm        ; org-mode for client relations management
        email           ; Emacs as an email client
-       ;; TODO finance         ; keeping track of my shekels
+       ;; TODO finance    ; keeping track of my shekels
+       ;; TODO irc        ; how neckbeards socialize
        present         ; showing off presentations in emacs
        rss             ; emacs as an RSS reader
        twitter         ; twitter client https://twitter.com/vnought
