@@ -206,3 +206,4 @@ for function signatures or notes. Run again to clear the header line."
                     (setq content (replace-regexp-in-string "\n" " " content t t))
                     (setq content (replace-regexp-in-string "\\s-+" " " content))
                     content)))))
+

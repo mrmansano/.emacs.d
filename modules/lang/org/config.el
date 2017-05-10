@@ -99,9 +99,11 @@
 
   (setq-default
    org-export-coding-system 'utf-8
-   org-todo-keywords '((sequence "[ ](t)" "[-](p)" "[?](m)" "|" "[X](d)")
-                       (sequence "TODO(T)" "|" "DONE(D)")
-                       (sequence "IDEA(i)" "NEXT(n)" "ACTIVE(a)" "WAITING(w)" "LATER(l)" "|" "CANCELLED(c)"))
+   org-todo-keywords
+   '((sequence "[ ](t)" "[-](p)" "[?](m)" "|" "[X](d)")
+     (sequence "TODO(T)" "|" "DONE(D)")
+     (sequence "IDEA(i)" "NEXT(n)" "ACTIVE(a)" "WAITING(w)" "LATER(l)"
+               "|" "CANCELLED(c)"))
 
    ;; Appearance
    outline-blank-line t
@@ -109,8 +111,7 @@
    org-adapt-indentation nil
    org-cycle-separator-lines 1
    org-cycle-include-plain-lists t
-   ;; org-ellipsis " ... "
-   org-ellipsis "  "
+   ;; org-ellipsis "  "
    org-entities-user '(("flat"  "\\flat" nil "" "" "266D" "♭")
                        ("sharp" "\\sharp" nil "" "" "266F" "♯"))
    org-fontify-done-headline t
@@ -362,11 +363,35 @@
                       (IS-LINUX "xdg-open \"%s\"")))))
 
   ;; Remove highlights on ESC
-  (defun +org*remove-occur-highlights (&rest args)
+  (defun +org|remove-occur-highlights (&rest args)
     (when (eq major-mode 'org-mode)
       (org-remove-occur-highlights)))
-  (advice-add #'evil-force-normal-state :before #'+org*remove-occur-highlights)
+  (add-hook '+evil-esc-hook #'+org|remove-occur-highlights)
 
-  ;; Don't reset org-hide!
-  (advice-add #'org-find-invisible-foreground :override #'ignore))
+  (after! org-bullets
+    (define-minor-mode org-bullets-mode
+      "Modified version of `org-bullets-mode' that respects the `org-hide' face."
+      nil nil nil
+      (let* ((keyword
+              `((,org-outline-regexp-bol
+                 (0 (let ((level (- (match-end 0) (match-beginning 0) 1)))
+                      (compose-region (- (match-end 0) 2)
+                                      (- (match-end 0) 1)
+                                      (org-bullets-level-char level))
+                      (when (facep org-bullets-face-name)
+                        (put-text-property (- (match-end 0) 2)
+                                           (- (match-end 0) 1)
+                                           'face org-bullets-face-name))
+                      (put-text-property (match-beginning 0) (match-end 0)
+                                         'keymap org-bullets-bullet-map)
+                      nil))))))
+        (if org-bullets-mode
+            (progn (font-lock-add-keywords nil keyword)
+                   (font-lock-fontify-buffer))
+          (save-excursion
+            (goto-char (point-min))
+            (font-lock-remove-keywords nil keyword)
+            (while (re-search-forward org-outline-regexp-bol nil t)
+              (decompose-region (match-beginning 0) (match-end 0)))
+            (font-lock-fontify-buffer)))))))
 

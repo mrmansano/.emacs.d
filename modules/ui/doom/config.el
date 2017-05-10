@@ -50,9 +50,10 @@
                       :background (face-background 'doom-hl-line))
 
   (defface +doom-folded-face
-    `((t (:inherit font-lock-comment-face
-          :background ,(face-background 'doom-default)
-          :foreground ,(face-foreground 'font-lock-comment-face))))
+    `((((background dark))
+       (:inherit font-lock-comment-face :background ,(doom-color 'black)))
+      (((background light))
+       (:inherit font-lock-comment-face :background ,(doom-color 'light-grey))))
     "Face to hightlight `hideshow' overlays."
     :group 'doom)
 
@@ -85,13 +86,13 @@
     (add-hook '+workspaces-load-session-hook #'+doom|restore-bright-buffers))
 
   ;; Add file icons to doom-neotree
-  (require 'doom-neotree)
+  (doom-themes-neotree-config)
   (setq doom-neotree-enable-variable-pitch t
         doom-neotree-file-icons 'simple
         doom-neotree-line-spacing 3)
 
   ;; Add line-highlighting to nlinum
-  (require 'doom-nlinum))
+  (doom-themes-nlinum-config))
 
 
 ;; Flashes the line around the cursor after any motion command that might
@@ -108,6 +109,8 @@
   (add-hook! :append
     '(imenu-after-jump-hook evil-jumps-post-jump-hook find-file-hook)
     'doom/blink-cursor)
+
+  (advice-add #'recenter :after #'doom/blink-cursor)
 
   (after! evil
     (advice-add #'evil-window-bottom :after #'doom/blink-cursor)

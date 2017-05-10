@@ -68,6 +68,7 @@ limit to buffers in the current workspace."
 
 ;;;###autoload
 (defun +ivy/kill-ring ()
+  "Search through the kill ring with `ivy'."
   (interactive)
   (ivy-read "Kill ring:"
             (cl-remove-if (lambda (it)
@@ -75,40 +76,134 @@ limit to buffers in the current workspace."
                                 (string-match-p "\\`[\n[:blank:]]+\\'" it)))
                           (cl-remove-duplicates kill-ring :test 'equal))))
 
+(defun +ivy--tasks-candidates ()
+  "Generate a list of task tags (specified by `+ivy-task-tags') for
+`+ivy/tasks'."
+  (let ((default-directory (if arg default-directory (doom-project-root)))
+        case-fold-search)
+    (mapcar (lambda (x)
+              (save-match-data
+                (string-match (concat "^\\([^:]+\\):\\([0-9]+\\):.+\\("
+                                      (string-join (mapcar #'car +ivy-task-tags) "\\|")
+                                      "\\):?\\s-*\\(.+\\)")
+                              x)
+                (let* (case-fold-search
+                       (file (match-string 1 x))
+                       (line (match-string 2 x))
+                       (type (match-string 3 x))
+                       (desc (match-string 4 x)))
+                  (format "%-5s %-90s %s:%s"
+                          (propertize type 'face (cdr (assoc type +ivy-task-tags)))
+                          (substring desc 0 (min 90 (length desc)))
+                          (propertize file 'face 'font-lock-keyword-face)
+                          (propertize line 'face 'font-lock-constant-face)))))
+            (split-string (shell-command-to-string
+                           (format "rg -H -S --no-heading --line-number %s %s"
+                                   (concat " -- "
+                                           (shell-quote-argument (concat "\\s("
+                                                                         (string-join (mapcar #'car +ivy-task-tags) "|")
+                                                                         ")([\\s:]|\\([^)]+\\):?)")))
+                                   (if arg buffer-file-name ".")))
+                          "\n" t))))
+
+(defun +ivy--tasks-open-action (x)
+  "Jump to the file and line of the current task."
+  (let* ((spec (split-string (substring x 97) ":"))
+         (type (car (split-string x " ")))
+         (file (car spec))
+         (line (string-to-number (cadr spec))))
+    (with-ivy-window
+      (find-file (expand-file-name file (doom-project-root)))
+      (goto-char (point-min))
+      (forward-line (1- line))
+      (search-forward type (line-end-position) t)
+      (backward-char (length type))
+      (recenter))))
+
 ;;;###autoload
-(defun +ivy/tasks ()
-  (interactive)
-  ;; TODO Make nicer
-  (counsel-ag " (TODO|FIXME|NOTE) " (doom-project-root)))
+(defun +ivy/tasks (&optional arg)
+  "Search through all TODO/FIXME tags in the current project. If ARG, only
+search current file. See `+ivy-task-tags' to customize what this searches for."
+  (interactive "P")
+  (ivy-read (format "Tasks (%s): "
+                    (if arg
+                        (concat "in: " (file-relative-name buffer-file-name))
+                      "project"))
+            (+ivy--tasks-candidates)
+            :action #'+ivy--tasks-open-action
+            :caller '+ivy/tasks))
 
 ;;;###autoload
 (defun +ivy*counsel-ag-function (string base-cmd extra-ag-args)
-  "Advice to get rid of the character limit from `counsel-ag-function', which
-interferes with my custom :ag ex command `+ivy:ag-search'."
+  "Advice to 1) get rid of the character limit from `counsel-ag-function' and 2)
+disable ivy's over-zealous parentheses quoting behavior (if i want literal
+parentheses, I'll escape them myself).
+
+NOTE This may need to be updated frequently, to meet changes upstream (in
+counsel-rg)."
   (when (null extra-ag-args)
     (setq extra-ag-args ""))
-  (if (< (length string) 1)
+  (if (< (length string) 1)  ;; #1
       (counsel-more-chars 1)
     (let ((default-directory counsel--git-grep-dir)
           (regex (counsel-unquote-regex-parens
                   (setq ivy--old-re
-                        (ivy--regex string)))))
-      (let ((ag-cmd (format base-cmd
-                            (concat extra-ag-args
-                                    " -- "
-                                    (shell-quote-argument regex)))))
+                        (ivy--regex
+                         (counsel-unquote-regex-parens string)))))) ;; #2
+      (let* ((args-end (string-match " -- " extra-ag-args))
+             (file (if args-end
+                       (substring-no-properties extra-ag-args (+ args-end 3))
+                     ""))
+             (extra-ag-args (if args-end
+                                (substring-no-properties extra-ag-args 0 args-end)
+                              extra-ag-args))
+             (ag-cmd (format base-cmd
+                             (concat extra-ag-args
+                                     " -- "
+                                     (shell-quote-argument regex)
+                                     file))))
         (if (file-remote-p default-directory)
             (split-string (shell-command-to-string ag-cmd) "\n" t)
           (counsel--async-command ag-cmd)
           nil)))))
 
 ;;;###autoload
-(defun +ivy/counsel-ag-occur ()
-  "Invoke the search+replace wgrep buffer on the current ag search results."
+(defun +ivy/wgrep-occur ()
+  "Invoke the search+replace wgrep buffer on the current ag/rg search results."
   (interactive)
-  (require 'wgrep)
-  (call-interactively 'ivy-occur))
+  (if (not (window-minibuffer-p))
+      (user-error "No completion session is active")
+    (require 'wgrep)
+    (let* ((caller (ivy-state-caller ivy-last))
+           (occur-fn (plist-get ivy--occurs-list caller))
+           (buffer
+            (generate-new-buffer
+             (format "*ivy-occur%s \"%s\"*"
+                     (if caller (concat " " (prin1-to-string caller)) "")
+                     ivy-text))))
+      (with-current-buffer buffer
+        (let ((inhibit-read-only t))
+          (erase-buffer)
+          (funcall occur-fn))
+        (setf (ivy-state-text ivy-last) ivy-text)
+        (setq ivy-occur-last ivy-last)
+        (setq-local ivy--directory ivy--directory))
+      (ivy-exit-with-action
+       `(lambda (_)
+          (pop-to-buffer ,buffer)
+          (ivy-wgrep-change-to-wgrep-mode))))))
 
 ;;;###autoload
 (defun +ivy-yas-prompt (prompt choices &optional display-fn)
   (yas-completing-prompt prompt choices display-fn #'ivy-completing-read))
+
+;;;###autoload
+(defun +ivy-git-grep-other-window-action (x)
+  "Opens the current candidate in another window."
+  (let (dest-window)
+    (cl-letf (((symbol-function 'find-file)
+               (lambda (filename)
+                 (find-file-other-window filename)
+                 (setq dest-window (selected-window)))))
+      (counsel-git-grep-action x)
+      (select-window dest-window))))

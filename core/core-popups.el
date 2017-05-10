@@ -69,6 +69,7 @@ is enabled/disabled.'")
           ("*Pp Eval Output*"       :size 16  :noselect t :autokill t :autoclose t)
           ("*Apropos*"              :size 0.3)
           ("*Backtrace*"            :size 25  :noselect t)
+          ("*Buffer List*"          :size 20  :autokill t)
           ("*Help*"                 :size 16)
           ("*Messages*"             :size 10  :noselect t)
           ("*Warnings*"             :size 10  :noselect t :autokill t)
@@ -237,6 +238,17 @@ properties."
 ;; Hacks
 ;;
 
+(progn ; hacks for built-in functions
+  (defun doom*buffer-menu (&optional arg)
+    "Open `buffer-menu' in a popup window."
+    (interactive "P")
+    (let ((buf (list-buffers-noselect arg)))
+      (doom-popup-buffer buf)
+      (with-current-buffer buf
+        (setq mode-line-format "Commands: d, s, x, u; f, o, 1, 2, m, v; ~, %; q to quit; ? for help."))))
+  (advice-add #'buffer-menu :override #'doom*buffer-menu))
+
+
 (after! evil
   (let ((map doom-popup-mode-map))
     (define-key map [remap evil-window-delete]           'doom/popup-close)
@@ -249,7 +261,7 @@ properties."
     (define-key map [remap evil-window-vsplit]           'ignore)
     (define-key map [remap evil-force-normal-state]      'doom/popup-close-maybe))
 
-  (defun doom*popup-close-all-maybe ()
+  (defun doom|popup-close-all-maybe ()
     "Close popups with an :autoclose property when pressing ESC from normal
 mode in any evil-mode buffer."
     (unless (or (doom-popup-p)
@@ -257,7 +269,7 @@ mode in any evil-mode buffer."
                 (and (bound-and-true-p evil-mode)
                      (evil-ex-hl-active-p 'evil-ex-search)))
       (doom/popup-close-all)))
-  (advice-add #'evil-force-normal-state :after #'doom*popup-close-all-maybe)
+  (add-hook '+evil-esc-hook #'doom|popup-close-all-maybe)
 
   ;; Make evil-mode cooperate with popups
   (advice-add #'evil-command-window :override #'doom*popup-evil-command-window)
@@ -357,31 +369,24 @@ the command buffer."
 
 
 (after! neotree
-  (defun doom*popups-save-neotree (orig-fn &rest args)
-    "Prevents messing up the neotree buffer on window changes."
-    (let ((neo-p (and (featurep 'neotree)
-                      (neo-global--window-exists-p))))
-      (when neo-p
-        (neotree-hide))
-      (unwind-protect (apply orig-fn args)
-        (when neo-p
-          (save-selected-window
-            (neotree-show))))))
+  ;; Neotree has its own window/popup management built-in, which is difficult to
+  ;; police. For example, switching perspectives will cause neotree to forget it
+  ;; is a neotree pane.
+  ;;
+  ;; By handing neotree over to shackle, which is better integrated into the
+  ;; rest of my config (and persp-mode), this is no longer a problem.
+  (setq neo-display-action '(+evil-neotree-display-fn))
+  (set! :popup " *NeoTree*" :align 'left :size 25)
 
-  ;; Prevents messing up the neotree buffer on window changes
-  (advice-add #'+evil-window-move :around #'doom*popups-save-neotree)
-  ;; Don't let neotree interfere with moving, splitting or rebalancing windows
-  (advice-add #'evil-window-move-very-bottom :around #'doom*popups-save-neotree)
-  (advice-add #'evil-window-move-very-top    :around #'doom*popups-save-neotree)
-  (advice-add #'evil-window-move-far-left    :around #'doom*popups-save-neotree)
-  (advice-add #'evil-window-move-far-right   :around #'doom*popups-save-neotree))
+  (defun +evil-neotree-display-fn (buf _alist)
+    (doom-popup-buffer buf)))
 
 
 (after! mu4e
-  (advice-add #'mu4e~temp-window :override #'doom*mu4e~temp-window)
-  (defun doom*mu4e~temp-window (buf height)
+  (defun doom*mu4e-popup-window (buf height)
     (doom-popup-buffer buf :size 10 :noselect t)
-    buf))
+    buf)
+  (advice-add #'mu4e~temp-window :override #'doom*mu4e-popup-window))
 
 
 (after! twittering-mode
@@ -389,15 +394,15 @@ the command buffer."
 
 
 (after! xref
-  (advice-add 'xref-goto-xref :around '+jump*xref-goto-xref)
-  (defun +jump*xref-goto-xref (orig-fn &rest args)
+  (defun doom*xref-follow-and-close (orig-fn &rest args)
     "Jump to the xref on the current line, select its window and close the popup
 you came from."
     (interactive)
     (let ((popup-p (doom-popup-p))
           (window (selected-window)))
       (apply orig-fn args)
-      (when popup-p (doom/popup-close window)))))
+      (when popup-p (doom/popup-close window))))
+  (advice-add 'xref-goto-xref :around 'doom*xref-follow-and-close))
 
 
 ;; Ensure these settings are attached to org-load-hook as late as possible,
@@ -420,17 +425,16 @@ you came from."
       '("^CAPTURE.*\\.org$"  :regexp t :size 20))
 
     ;; Org tries to do its own popup management, causing buffer/window config
-    ;; armageddon when paired with shackle. To fix this, we must make a couple modifications:
+    ;; armageddon when paired with shackle. To fix this, we must make a couple
+    ;; modifications:
 
     ;; Suppress `delete-other-windows' in org functions:
     (defun doom*suppress-delete-other-windows (orig-fn &rest args)
-      (cl-flet ((silence (&rest args) (ignore)))
-        (advice-add #'delete-other-windows :around #'silence)
-        (unwind-protect
-            (apply orig-fn args)
-          (advice-remove #'delete-other-windows #'silence))))
-    (advice-add #'org-capture-place-template :around #'doom*suppress-delete-other-windows)
+      (cl-flet (((symbol-function 'delete-other-windows)
+                 (symbol-function 'ignore)))
+        (apply orig-fn args)))
     (advice-add #'org-add-log-note :around #'doom*suppress-delete-other-windows)
+    (advice-add #'org-capture-place-template :around #'doom*suppress-delete-other-windows)
     (advice-add #'org-export--dispatch-ui :around #'doom*suppress-delete-other-windows)
 
     ;; Tell `org-src-edit' to open another window, which shackle can intercept.
@@ -450,20 +454,20 @@ you came from."
     (advice-add #'org-edit-src-exit :after #'doom*org-src-exit)
 
     ;; Ensure todo, agenda, and other popups are opened with shackle
-    (defun doom*org-switch-to-buffer-other-window (&rest args)
+    (defun doom*org-pop-to-buffer (&rest args)
       (let ((buf (car args)))
         (pop-to-buffer
          (cond ((stringp buf) (get-buffer-create buf))
                ((bufferp buf) buf)
                (t (error "Invalid buffer %s" buf))))))
-    (advice-add #'org-switch-to-buffer-other-window :override #'doom*org-switch-to-buffer-other-window)
-
-    ;; Hide modeline in org-agenda
-    (add-hook 'org-agenda-finalize-hook #'doom-hide-modeline-mode)
+    (advice-add #'org-switch-to-buffer-other-window :override #'doom*org-pop-to-buffer)
 
     (after! org-agenda
       (setq org-agenda-window-setup 'other-window
             org-agenda-restore-windows-after-quit nil)
+
+      ;; Hide modeline in org-agenda
+      (add-hook 'org-agenda-finalize-hook #'doom-hide-modeline-mode)
 
       (advice-add #'org-agenda :around #'doom*suppress-delete-other-windows)
 

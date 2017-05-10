@@ -47,22 +47,29 @@
     '("*evil-registers*" :size 0.3)
     '("*Command Line*" :size 8))
 
+  ;; Don't interfere with localleader key
+  (define-key evil-motion-state-map "\\" nil)
+
   ;; Set cursor colors later, presumably once theme is loaded
   (defun +evil*init-cursors (&rest _)
-    (setq evil-default-cursor (face-attribute 'cursor :background nil t)
+    (setq evil-default-cursor (face-background 'cursor nil t)
           evil-normal-state-cursor 'box
-          evil-emacs-state-cursor  `(,(face-attribute 'warning :foreground nil nil) box)
+          evil-emacs-state-cursor  `(,(face-foreground 'warning) box)
           evil-insert-state-cursor 'bar
           evil-visual-state-cursor 'hollow))
   (advice-add #'load-theme :after #'+evil*init-cursors)
 
   ;; highlight matching delimiters where it's important
   (defun +evil|show-paren-mode-off () (show-paren-mode -1))
-  (add-hook 'evil-insert-state-entry-hook   #'show-paren-mode)
+  (defun +evil|show-paren-mode-on ()
+    (unless (bound-and-true-p org-indent-mode) ; interferes with org-indent
+      (show-paren-mode +1)))
+
+  (add-hook 'evil-insert-state-entry-hook   #'+evil|show-paren-mode-on)
   (add-hook 'evil-insert-state-exit-hook    #'+evil|show-paren-mode-off)
-  (add-hook 'evil-visual-state-entry-hook   #'show-paren-mode)
+  (add-hook 'evil-visual-state-entry-hook   #'+evil|show-paren-mode-on)
   (add-hook 'evil-visual-state-exit-hook    #'+evil|show-paren-mode-off)
-  (add-hook 'evil-operator-state-entry-hook #'show-paren-mode)
+  (add-hook 'evil-operator-state-entry-hook #'+evil|show-paren-mode-on)
   (add-hook 'evil-operator-state-exit-hook  #'+evil|show-paren-mode-off)
   (add-hook 'evil-normal-state-entry-hook   #'+evil|show-paren-mode-off)
 
@@ -87,13 +94,35 @@
 ;; evil hacks
 ;;
 
-(defun +evil*esc ()
-  "Disable search highlights and quit the minibuffer if open."
+(defvar +evil-esc-hook nil
+  "A hook run after ESC is pressed in normal mode (invoked by
+`evil-force-normal-state').")
+
+(defun +evil*attach-escape-hook ()
+  "Run the `+evil-esc-hook'."
+  (run-hooks '+evil-esc-hook))
+(advice-add #'evil-force-normal-state :after #'+evil*attach-escape-hook)
+
+(defun +evil|escape-minibuffer ()
+  "Quit the minibuffer if open."
   (when (minibuffer-window-active-p (minibuffer-window))
-    (abort-recursive-edit))
+    (abort-recursive-edit)))
+
+(defun +evil|escape-highlights ()
+  "Disable ex search buffer highlights."
   (when (evil-ex-hl-active-p 'evil-ex-search)
     (evil-ex-nohighlight)))
-(advice-add #'evil-force-normal-state :after #'+evil*esc)
+
+(add-hook! '+evil-esc-hook '(+evil|escape-minibuffer +evil|escape-highlights))
+
+(defun +evil*restore-normal-state-on-windmove (orig-fn &rest args)
+  "If in anything but normal or motion mode when moving to another window,
+restore normal mode. This prevents insert state from bleeding into other modes
+across windows."
+  (unless (memq evil-state '(normal motion))
+    (evil-normal-state +1))
+  (apply orig-fn args))
+(advice-add #'windmove-do-window-select :around #'+evil*restore-normal-state-on-windmove)
 
 (defun +evil*static-reindent (orig-fn &rest args)
   "Don't move cursor on indent."
@@ -162,27 +191,26 @@
   :defer 1
   :commands evilem-define
   :config
-  (defvar +evil--snipe-repeat-fn)
+  (let ((prefix "g SPC"))
+    (evilem-default-keybindings prefix)
+    (evilem-define (kbd (concat prefix " n")) #'evil-ex-search-next)
+    (evilem-define (kbd (concat prefix " N")) #'evil-ex-search-previous)
+    (evilem-define (kbd (concat prefix " s")) 'evil-snipe-repeat
+                   :pre-hook (save-excursion (call-interactively #'evil-snipe-s))
+                   :bind ((evil-snipe-scope 'buffer)
+                          (evil-snipe-enable-highlight)
+                          (evil-snipe-enable-incremental-highlight)))
+    (evilem-define (kbd (concat prefix " S")) #'evil-snipe-repeat-reverse
+                   :pre-hook (save-excursion (call-interactively #'evil-snipe-s))
+                   :bind ((evil-snipe-scope 'buffer)
+                          (evil-snipe-enable-highlight)
+                          (evil-snipe-enable-incremental-highlight))))
 
-  (evilem-default-keybindings "g SPC")
-  (evilem-define (kbd "g SPC n") #'evil-ex-search-next)
-  (evilem-define (kbd "g SPC N") #'evil-ex-search-previous)
-  (evilem-define "gs" #'evil-snipe-repeat
-                 :pre-hook (save-excursion (call-interactively #'evil-snipe-s))
-                 :bind ((evil-snipe-scope 'buffer)
-                        (evil-snipe-enable-highlight)
-                        (evil-snipe-enable-incremental-highlight)))
-  (evilem-define "gS" #'evil-snipe-repeat-reverse
-                 :pre-hook (save-excursion (call-interactively #'evil-snipe-s))
-                 :bind ((evil-snipe-scope 'buffer)
-                        (evil-snipe-enable-highlight)
-                        (evil-snipe-enable-incremental-highlight)))
-
-  (setq +evil--snipe-repeat-fn
-        (evilem-create #'evil-snipe-repeat
-                       :bind ((evil-snipe-scope 'whole-buffer)
-                              (evil-snipe-enable-highlight)
-                              (evil-snipe-enable-incremental-highlight)))))
+  (defvar +evil--snipe-repeat-fn
+    (evilem-create #'evil-snipe-repeat
+                   :bind ((evil-snipe-scope 'whole-buffer)
+                          (evil-snipe-enable-highlight)
+                          (evil-snipe-enable-incremental-highlight)))))
 
 
 (def-package! evil-embrace
@@ -257,9 +285,9 @@
 (def-package! evil-exchange
   :commands evil-exchange
   :config
-  (defun +evil*exchange-off ()
+  (defun +evil|escape-exchange ()
     (if evil-exchange--overlays (evil-exchange-cancel)))
-  (advice-add #'evil-force-normal-state :after #'+evil*exchange-off))
+  (add-hook '+evil-esc-hook #'+evil|escape-exchange))
 
 
 (def-package! evil-indent-plus
@@ -286,6 +314,43 @@ algorithm is just confusing, like in python or ruby."
     (setq-local evilmi-always-simple-jump t)))
 
 
+(def-package! evil-mc
+  :commands evil-mc-make-cursor-here
+  :init
+  (defvar evil-mc-key-map (make-sparse-keymap))
+  (map! :n "M-d" #'evil-mc-make-cursor-here)
+
+  :config
+  ;; Start evil-mc in paused mode.
+  (add-hook 'evil-mc-mode-hook #'evil-mc-pause-cursors)
+  (add-hook 'evil-mc-before-cursors-created #'evil-mc-pause-cursors)
+
+  (global-evil-mc-mode 1)
+  (setq evil-mc-custom-known-commands
+        '((doom/deflate-space-maybe . ((:default . evil-mc-execute-default-call)))))
+
+  (defun +evil/mc-toggle-cursors ()
+    "Toggle frozen state of evil-mc cursors."
+    (interactive)
+    (setq evil-mc-frozen (not (and (evil-mc-has-cursors-p)
+                                   evil-mc-frozen))))
+
+  ;; My workflow is to place the cursors, get into position, then enable evil-mc
+  ;; (either by going into insert mode, or pressing M-d).
+  (map! :map evil-mc-key-map
+        :n "M-D" #'+evil/mc-toggle-cursors)
+
+  ;; If I switch to insert mode, chances are I want to begin editing.
+  (add-hook 'evil-insert-state-entry-hook #'evil-mc-resume-cursors)
+
+  ;; Undo cursors on ESC (from normal mode)
+  (defun +evil|escape-multiple-cursors ()
+    "Undo cursors and freeze them again (for next time)."
+    (when (evil-mc-has-cursors-p)
+      (evil-mc-undo-all-cursors)))
+  (add-hook '+evil-esc-hook #'+evil|escape-multiple-cursors))
+
+
 (def-package! evil-multiedit
   :commands (evil-multiedit-match-all
              evil-multiedit-match-and-next
@@ -297,7 +362,21 @@ algorithm is just confusing, like in python or ruby."
              evil-multiedit-prev
              evil-multiedit-abort
              evil-multiedit-ex-match)
-  :config (evil-multiedit-default-keybinds))
+  :init
+  (map! :v "M-d"   #'evil-multiedit-match-and-next
+        :v "M-D"   #'evil-multiedit-match-and-prev
+        :v "C-M-d" #'evil-multiedit-restore
+        :v "R"     #'evil-multiedit-match-all)
+
+  :config
+  (evil-ex-define-cmd "ie[dit]" 'evil-multiedit-ex-match)
+  (map! (:map evil-multiedit-state-map
+          "M-d" #'evil-multiedit-match-and-next
+          "M-D" #'evil-multiedit-match-and-prev
+          "RET" #'evil-multiedit-toggle-or-restrict-region)
+        (:map (evil-multiedit-state-map evil-multiedit-insert-state-map)
+          "C-n" #'evil-multiedit-next
+          "C-p" #'evil-multiedit-prev)))
 
 
 (def-package! evil-textobj-anyblock
@@ -310,7 +389,7 @@ algorithm is just confusing, like in python or ruby."
   :commands (evil-textobj-anyblock-inner-block evil-textobj-anyblock-a-block)
   :config
   (global-evil-search-highlight-persist t)
-  (advice-add #'evil-force-normal-state :after #'evil-search-highlight-persist-remove-all))
+  (add-hook '+evil-esc-hook #'evil-search-highlight-persist-remove-all))
 
 
 (def-package! evil-snipe :demand t
@@ -327,7 +406,7 @@ algorithm is just confusing, like in python or ruby."
   :config
   ;; (evil-snipe-mode +1)
   (evil-snipe-override-mode +1)
-  ;; Switch to evil-easymotion/avy after first snipe
+  ;; Switch to evil-easymotion/avy after a snipe
   (map! :map evil-snipe-parent-transient-map
         "C-;" (λ! (require 'evil-easymotion)
                   (call-interactively +evil--snipe-repeat-fn))))
@@ -349,7 +428,9 @@ algorithm is just confusing, like in python or ruby."
   :config (global-evil-visualstar-mode 1))
 
 
-;; A side-panel for browsing my project files. Inspired by vim's NERDTree.
+;; A side-panel for browsing my project files. Inspired by vim's NERDTree. Sure,
+;; there's dired and projectile, but sometimes I'd like a bird's eye view of a
+;; project.
 (def-package! neotree
   :commands (neotree-show
              neotree-hide
@@ -359,8 +440,9 @@ algorithm is just confusing, like in python or ruby."
              neo-global--with-buffer
              neo-global--window-exists-p)
   :config
-  (setq neo-create-file-auto-open t
+  (setq neo-create-file-auto-open nil
         neo-auto-indent-point nil
+        neo-autorefresh nil
         neo-mode-line-type 'none
         neo-window-width 25
         neo-show-updir-line nil
@@ -383,15 +465,14 @@ algorithm is just confusing, like in python or ruby."
 
   (push neo-buffer-name winner-boring-buffers)
 
-  ;; Don't ask for confirmation when creating files
   (defun +evil*neotree-create-node (orig-fun &rest args)
     "Don't ask for confirmation when creating files"
     (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) t)))
       (apply orig-fun args)))
   (advice-add #'neotree-create-node :around #'+evil*neotree-create-node)
 
-  ;; Adding keybindings to `neotree-mode-map' wouldn't work for me (they get
-  ;; overridden when the neotree buffer is spawned). So we bind them in a hook.
+  ;; `neotree-mode-map' are overridden when the neotree buffer is created. So we
+  ;; bind them in a hook.
   (add-hook 'neo-after-create-hook #'+evil|neotree-init-keymap)
   (defun +evil|neotree-init-keymap (&rest _)
     (map! :Lm "\\\\"     'evil-window-prev
@@ -404,6 +485,10 @@ algorithm is just confusing, like in python or ruby."
           :Lm "K"        'neotree-select-previous-sibling-node
           :Lm "H"        'neotree-select-up-node
           :Lm "L"        'neotree-select-down-node
+          :Lm "h"        '+evil/neotree-collapse-or-up
+          :Lm "j"        'neotree-next-line
+          :Lm "k"        'neotree-previous-line
+          :Lm "l"        '+evil/neotree-expand-or-open
           :Lm "v"        'neotree-enter-vertical-split
           :Lm "s"        'neotree-enter-horizontal-split
           :Lm "c"        'neotree-create-node
@@ -411,4 +496,3 @@ algorithm is just confusing, like in python or ruby."
           :Lm "\C-r"     'neotree-refresh
           :Lm "r"        'neotree-rename-node
           :Lm "R"        'neotree-change-root)))
-

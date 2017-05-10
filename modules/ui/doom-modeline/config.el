@@ -46,7 +46,7 @@
   ;; Ensure anzu state is cleared when searches & iedit are done
   (add-hook! '(kill-buffer-hook find-file-hook) #'+doom-modeline|reset-anzu)
   (after! evil
-    (advice-add #'evil-force-normal-state :after #'+doom-modeline|reset-anzu)
+    (add-hook '+evil-esc-hook #'+doom-modeline|reset-anzu t)
     (advice-add #'evil-ex-search-abort :after #'+doom-modeline|reset-anzu)
     (after! evil-multiedit
       (add-hook 'iedit-mode-end-hook #'+doom-modeline|reset-anzu))))
@@ -59,11 +59,11 @@
 (defun doom-visual-bell ()
   "Blink the mode-line red briefly."
   (unless doom--visual-bell-old-bg
-    (setq doom--visual-bell-old-bg (face-attribute 'mode-line :background)))
-  (set-face-attribute 'mode-line nil :background "#54252C")
+    (setq doom--visual-bell-old-bg (face-background 'mode-line)))
+  (set-face-background 'mode-line "#54252C")
   (run-with-timer
    0.1 nil
-   (lambda () (set-face-attribute 'mode-line nil :background doom--visual-bell-old-bg))))
+   (lambda () (set-face-background 'mode-line doom--visual-bell-old-bg))))
 (setq ring-bell-function #'doom-visual-bell
       visible-bell nil)
 

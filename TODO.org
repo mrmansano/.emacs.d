@@ -5,38 +5,39 @@
 + [-] Work-in-progress
 + [X] Complete
 
-** Unreleased [45/124]
-+ [1/11] Potential plugins
+** Planned [6/80]
++ [0/10] Potential plugins
   + [ ] [[https://github.com/emacs-lsp/lsp-mode][lsp-mode]]: client for MS Language Server Protocol, keep an eye on this
   + [ ] lang/javascript: [[https://github.com/codesuki/add-node-modules-path][add-node-modules-path]] (adds node_modules to ~exec-path~)
-  + [ ] feature/version-control: [[https://github.com/sshaw/git-link][git-link]] (replacement for browse-at-remote)
   + [ ] lang/org: [[https://github.com/Malabarba/latex-extra][orgit]] (org links to magit buffers)
   + [ ] lang/org: [[https://github.com/jkitchin/org-ref][org-ref]] (bibtex/citation helper)
+  + [ ] lang/org: [[https://github.com/tashrifsanil/org-easy-img-insert][org-easy-img-insert]]
   + [ ] lang/latex: [[https://github.com/Malabarba/latex-extra][latex-extra]] (utility commands)
   + [ ] lang/latex: [[**https://github.com/jsinglet/latex-preview-pane][latex-preview-pane]]
   + [ ] lang/julia: [[ https://github.com/dennisog/julia-shell-mode][julia-shell]] (unsure if better than inferior-julia in julia-mode)
   + [ ] lang/python: [[https://github.com/Wilfred/pyimport][pyimport]]
   + [ ] An image plugin for zooming images at point
     + https://github.com/mhayashi1120/Emacs-imagex ?
-  + [X] feature/version-control: [[https://github.com/pidu/git-timemachine][git-timemachine]] (replacement for vc-annotate)
-+ [0/4] New modules
++ [0/5] New modules
+  + [ ] tools/regex (PCRE regex editor, perhaps use ~re-builder~ & ~pcre2el~?)
   + [ ] app/finance (maybe settle for org-mode tables?)
   + [ ] app/irc
   + [-] app/crm
   + [-] app/write
-+ [1/57] Add README.org's (with working babel blocks?) to modules (see [[modules/lang/go/README.org][lang/go/README.org]])
-  + [0/8] :tools
++ [6/58] Add README.org's (with working babel blocks?) to modules (see [[modules/lang/go/README.org][lang/go/README.org]]) to replace bootstaps
+  + [0/9] :tools
     + [ ] dired
     + [ ] electric-indent
     + [ ] eshell
+    + [ ] gist
     + [ ] macos
     + [ ] rotate-text
     + [ ] term
     + [ ] tmux
     + [ ] upload
-  + [1/25] :lang
+  + [3/25] :lang
     + [ ] assembly
-    + [ ] cc
+    + [X] cc
     + [ ] crystal
     + [ ] csharp
     + [ ] data
@@ -52,7 +53,7 @@
     + [ ] org
     + [ ] php
     + [ ] python
-    + [ ] rest
+    + [X] rest
     + [ ] ruby
     + [ ] rust
     + [ ] scala
@@ -71,36 +72,59 @@
     + [ ] syntax-checker
     + [ ] version-control
     + [ ] workspaces
-  + [0/5] :ui
-    + [ ] doom
+  + [1/5] :ui
+    + [X] doom
     + [ ] doom-dashboard
     + [ ] doom-modeline
     + [ ] doom-quit
     + [ ] hl-todo
-  + [0/4] :completion
-    + [ ] ivy
+  + [1/4] :completion
+    + [X] ivy
     + [ ] company
     + [ ] ido
     + [ ] helm
-  + [0/5] :app
-    + [ ] email
+  + [1/5] :app
+    + [X] email
     + [ ] write
     + [ ] rss
     + [ ] twitter
     + [ ] present
-+ [ ] Fix invisible modeline in terminal Emacs
-+ [ ] Replace bootstrap system with informative READMEs
-  Bootstaps are inflexible/too opinionated, even for my own needs.
++ [ ] Write ~describe-setting~ for ~def-setting!~ definitions.
++ [ ] lang/org: restore cursor to sane location after prepending/appending new table cells.
++ [ ] lang/org: don't move cursor when realigning tables when exiting insert state.
++ [ ] lang/org: typing certain characters and keys while in a table causes the cell to shrink (like smartparens pairs and keys not bound to self-insert-command)
++ [ ] Fix invisible buffer-info in modeline for terminal Emacs
++ [ ] tools/upload: add ~+upload/open-remote-file~ command to open current file on the remote (with TRAMP)
++ [ ] Make ~doom-visual-bell~ more flexible by basing it's bg color off a face
+
+** 2.0.2 [58/61]
++ [ ] Update screenshots
 + [ ] send-to-REPL workflow: does it still work? (see ~:repl~ & ~+eval/repl-send-region~)
-+ [ ] Fix ~M-z~, ~C-u~ and ~C-w~ in ~org-store-link~ & ~org-insert-link~ prompts
++ [ ] Fix ~0/0~ displaying in modeline (caused by leftover anzu state)
++ [X] completion/ivy: fix ~+ivy:find-file~ -- loss of functionality with coerced literal searches (better to escape regex rather than pass -F to rg)
++ [X] completion/ivy: refactor ~def-counsel-action!~ +into a setting (~def-setting!~)+
+  Refactored into ~ivy-do-action!~ macro instead
++ [X] completion/ivy: refactor ag-open-in-other-window (messy/hackish)
+  Now ~+ivy-git-grep-other-window-action~
++ [X] Fix ~+eval/region~ failing only on first invocation.
+  Caused by ~+eval-runners-alist~ not being populated until quickrun is loaded.
++ [X] Fix: Neotree forgets it's a neotree window when switching perspectives
+  + +Restore neotree state on perspective switch+
+  + +Or close neotree before switching/creating perspectives+
+  + Or hand neotree window management off to shackle
++ [X] feature/version-control: add [[https://github.com/sshaw/git-link][git-link]] (replacement for browse-at-remote)
++ [X] feature/version-control: add [[https://github.com/pidu/git-timemachine][git-timemachine]] (replacement for vc-annotate)
++ [X] completion/ivy: replace the_silver_searcher (ag) with ripgrep (rg) (counsel-ag => counsel-rg)
++ [X] Merge evil-mc workflow with evil-multiedit's (~M-d~ / ~M-D~)
++ [X] Add evil-mc plugin (with help from gilbertw1)
++ [X] Add tools/gist (gist.el)
++ [X] Fix ~show-paren-mode~ overlays conflicting with org-indent (causes flickering)
++ [X] Fix ~M-z~, ~C-u~ and ~C-w~ in ~org-store-link~ & ~org-insert-link~ prompts
   Should undo, delete-line, and delete-word, respectively. Instead, they fall
   back to vanilla commands.
-+ [ ] Update screenshots
-+ [ ] tools/upload: add ~+upload/open-remote-file~ command to open current file on the remote (with TRAMP)
-+ [ ] Fix ~0/0~ displaying in modeline (caused by leftover anzu state)
-+ [ ] Fix snippet-mode detection (perhaps use ~magic-mode-alist~? may)
-+ [-] lang/org: fix flickering line indentation while typing (caused by ~show-paren-mode~ in insert mode)
-+ [X] Detect & load ~/.emacs.local.el, if available
++ [X] Prevent 'buffer is read-only' messages while in minibuffer
++ [X] completion/ivy: replace Ag with RipGrep
++ [X] Detect & load \~/.emacs.local.el, if available
 + [X] lang/org: fontify items with all subitems done, e.g. ~+ [0/0] headline~
 + [X] lang/org: fontify checked-checkbox items the same way DONE headlines are
 + [X] lang/org: by default, unfold level 1 on startup (keep rest folded)
@@ -124,7 +148,8 @@
 + [X] ~ace-maximize-window~ is obsolete
 + [X] Fix whitespace adjustment in highlight-indentation-current-column-mode
 + [X] Toggle-able "pretty" mode for org-mode
-  Sometimes, fontification (like prettified entities or hidden regions) make editing difficult. Make this toggleable.
+  Sometimes, fontification (like prettified entities or hidden regions) make
+  editing difficult. Make this toggleable.
 + [X] Simplify matchit key (%) in python
   It prioritizes jumps between if-else and other blocks over brackets. Annoying!
 + [X] Fix over-eager ESC killing popups

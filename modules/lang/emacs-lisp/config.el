@@ -7,6 +7,7 @@
 
   :config
   (set! :repl 'emacs-lisp-mode #'+emacs-lisp/repl)
+  (set! :eval 'emacs-lisp-mode #'+emacs-lisp-eval)
   (set! :rotate 'emacs-lisp-mode
         :symbols '(("t" "nil")
                    ("let" "let*")
@@ -32,7 +33,7 @@
      nil `(;; Display "lambda" as λ
            ("(\\(lambda\\)" (1 (ignore (compose-region (match-beginning 1) (match-end 1) ?λ #'decompose-region))))
            ;; Highlight doom/module functions
-           ("\\(^\\|\\s-\\|,\\)(\\(\\(doom\\|\\+\\)[^) ]+\\)[) \n]" (2 font-lock-builtin-face))))
+           ("\\(^\\|\\s-\\|,\\)(\\(\\(doom\\|\\+\\)[^) ]+\\)[) \n]" (2 font-lock-constant-face))))
 
     (setq imenu-generic-expression
           '(("Evil Commands" "^\\s-*(evil-define-\\(?:command\\|operator\\|motion\\) +\\(\\_<[^ ()\n]+\\_>\\)" 1)

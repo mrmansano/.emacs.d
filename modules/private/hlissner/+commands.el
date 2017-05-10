@@ -14,7 +14,6 @@
 (ex! "dehtml"       '+web:decode-html-entities)
 (ex! "ie[dit]"      'evil-multiedit-ex-match)
 (ex! "na[rrow]"     '+evil:narrow-buffer)
-(ex! "ref[actor]"   'emr-show-refactor-menu)
 (ex! "retab"        '+evil:retab)
 
 ;; External resources
@@ -30,6 +29,8 @@
 (ex! "x"           '+doom:scratch-buffer)
 
 ;; GIT
+(ex! "gist"        '+gist:send)  ; send current buffer/region to gist
+(ex! "gistl"       '+gist:list)  ; list gists by user
 (ex! "gbrowse"     '+vcs/git-browse)        ; show file in github/gitlab
 (ex! "gissues"     '+vcs/git-browse-issues) ; show github issues
 (ex! "git"         'magit-status)           ; open magit status window
@@ -51,8 +52,8 @@
 
 ;; Project navigation
 (ex! "a"           'projectile-find-other-file)
-(ex! "ag"          '+ivy:ag-search)
-(ex! "ag[cw]d"     '+ivy:ag-search-cwd)
+(ex! "f[in]d"      '+ivy:file-search)
+(ex! "f[in]dcwd"   '+ivy:file-search-cwd)
 (ex! "cd"          '+hlissner:cd)
 (ex! "sw[iper]"    '+ivy:swiper)     ; in-file search
 
@@ -60,7 +61,7 @@
 (ex! "build"       '+eval/build)
 (ex! "debug"       '+debug/run)
 (ex! "er[rors]"    'flycheck-list-errors)
-(ex! "todo"        '+ivy/tasks)
+(ex! "todo"        '+ivy:todo)
 
 ;; File operations
 (ex! "mv"          '+evil:file-move)

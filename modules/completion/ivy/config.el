@@ -1,19 +1,17 @@
 ;;; completion/ivy/packages.el
 
-;; Ivy is my completion backend of choice. With counsel's help, I get:
-;;
-;; + Project-wide search with `counsel-ag' (or `+ivy:ag-search')
-;; + Project-wide replace if you press <backtab> in the ag occur buffer.
-;; + An Atom/Sublime-Text Command-T implementation with `counsel-find-file' and
-;;   `counsel-projectile-find-file'.
-;; + Ido-like completion for a slew of functions, like `counsel-M-x' and
-;;   `counsel-imenu'.
+(defvar +ivy-task-tags '(("TODO"  . warning)
+                         ("FIXME" . error))
+  "An alist of tags for `+ivy/tasks' to include in its search, whose CDR is the
+face to render it with.")
 
-;; TODO Make this a setting
-(defmacro def-counsel-action! (name &rest forms)
-  `(defun ,(intern (format "+ivy/counsel-%s" (symbol-name name))) ()
+(defmacro +ivy-do-action! (action)
+  "A factory function that returns an interactive lamba that sets the current
+ivy action and immediately runs it on the current candidate (ending the ivy
+session)."
+  `(lambda ()
      (interactive)
-     (ivy-set-action ',@forms)
+     (ivy-set-action ,action)
      (setq ivy-exit 'done)
      (exit-minibuffer)))
 
@@ -24,7 +22,7 @@
 
 (def-package! ivy :demand t
   :config
-  (setq ivy-height 14
+  (setq ivy-height 12
         ivy-do-completion-in-region nil
         ivy-wrap t
         ivy-fixed-height-minibuffer t
@@ -42,10 +40,14 @@
 
   (map! :map ivy-minibuffer-map
         [escape] #'keyboard-escape-quit
+        "M-v" #'yank
+        "M-z" #'undo
         "C-r" #'evil-paste-from-register
-        "M-v" #'clipboard-yank
-        "C-w" #'backward-kill-word
-        "C-u" #'backward-kill-sentence
+        "C-k" #'ivy-previous-line
+        "C-j" #'ivy-next-line
+        "C-l" #'ivy-alt-done
+        "C-w" #'doom-minibuffer-kill-word
+        "C-u" #'doom-minibuffer-kill-line
         "C-b" #'backward-word
         "C-f" #'forward-word)
 
@@ -60,7 +62,10 @@
         [remap projectile-switch-project] #'counsel-projectile-switch-project
         [remap projectile-find-file]      #'counsel-projectile-find-file
         [remap imenu-anywhere]            #'ivy-imenu-anywhere
-        [remap execute-extended-command]  #'counsel-M-x)
+        [remap execute-extended-command]  #'counsel-M-x
+        [remap describe-function]         #'counsel-describe-function
+        [remap describe-variable]         #'counsel-describe-variable
+        [remap describe-face]             #'counsel-describe-face)
 
   (when (featurep! :feature workspaces)
     (nconc ivy-sort-functions-alist
@@ -80,42 +85,24 @@
 (def-package! counsel
   :after ivy
   :config
-  (setq counsel-find-file-ignore-regexp "\\(?:^[#.]\\)\\|\\(?:[#~]$\\)\\|\\(?:^Icon?\\)")
-
-  (set! :popup "^\\*ivy-occur counsel-ag" :size 25 :regexp t :autokill t)
-
   (require 'counsel-projectile)
 
-  ;; FIXME Messy workaround, refactor this
-  (def-counsel-action! ag-open-in-other-window
-    (lambda (x)
-      (when (string-match "\\`\\(.*?\\):\\([0-9]+\\):\\(.*\\)\\'" x)
-        (let ((file-name (match-string-no-properties 1 x))
-              (line-number (match-string-no-properties 2 x))
-              dest-win)
-          (with-ivy-window
-            (find-file-other-window (expand-file-name file-name counsel--git-grep-dir))
-            (setq dest-win (selected-window))
-            (forward-line (1- (string-to-number line-number)))
-            (re-search-forward (ivy--regex ivy-text t) (line-end-position) t)
-            (recenter)
-            (swiper--ensure-visible)
-            (run-hooks 'counsel-grep-post-action-hook)
-            (unless (eq ivy-exit 'done)
-              (swiper--cleanup)
-              (swiper--add-overlays (ivy--regex ivy-text))))
-          (when dest-win
-            (select-window dest-win))))))
+  (setq counsel-find-file-ignore-regexp "\\(?:^[#.]\\)\\|\\(?:[#~]$\\)\\|\\(?:^Icon?\\)")
 
-  (add-hook! 'doom-popup-mode-hook
-    (when (eq major-mode 'ivy-occur-grep-mode)
-      (ivy-wgrep-change-to-wgrep-mode)))
+  ;; Configure `counsel-rg'/`counsel-ag'
+  (set! :popup "^\\*ivy-occur counsel-[ar]g" :size (+ 2 ivy-height) :regexp t :autokill t)
 
-  (advice-add #'counsel-ag-function :override #'+ivy*counsel-ag-function)
-  (map! :map counsel-ag-map
-        [backtab] #'+ivy/counsel-ag-occur     ; search/replace on results
-        "C-SPC"   #'counsel-git-grep-recenter ; preview
-        "M-RET"   #'+ivy/counsel-ag-open-in-other-window))
+  (ivy-add-actions
+   'counsel-rg
+   '(("O" +ivy-git-grep-other-window-action "open in other window")))
+
+  (map! :map counsel-ag-map ; applies to counsel-rg too
+        [backtab] #'+ivy/wgrep-occur  ; search/replace on results
+        "C-SPC"   #'counsel-git-grep-recenter   ; preview
+        "M-RET"   (+ivy-do-action! #'+ivy-git-grep-other-window-action))
+
+  ;; NOTE Both counsel-rg and counsel-ag use this function
+  (advice-add #'counsel-ag-function :override #'+ivy*counsel-ag-function))
 
 
 ;; Used by `counsel-M-x'
