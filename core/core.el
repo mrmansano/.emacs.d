@@ -106,6 +106,7 @@ there are problems.")
  tramp-auto-save-directory    (concat doom-cache-dir "tramp-auto-save/")
  tramp-backup-directory-alist backup-directory-alist
  tramp-persistency-file-name  (concat doom-cache-dir "tramp-persistency.el")
+ tramp-ssh-controlmaster-options ""
  url-cache-directory          (concat doom-cache-dir "url/")
  url-configuration-directory  (concat doom-etc-dir "url/")
  undo-tree-history-directory-alist (list (cons "." (concat doom-cache-dir "undo-tree-hist/"))))

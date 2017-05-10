@@ -33,7 +33,7 @@
 ;;;###autoload
 (defun doom-sudo (command &rest args)
   "Like `doom-sh', but runs as root (prompts for password)."
-  (let ((tramp-verbose 2))
+  (let ((tramp-verbose 5))
     (with-current-buffer (get-buffer-create "*doom-sudo*")
       (unless (string-prefix-p "/sudo::/" default-directory)
         (cd "/sudo::/"))

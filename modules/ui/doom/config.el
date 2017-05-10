@@ -4,7 +4,7 @@
   "The color theme currently in use.")
 
 (defvar +doom-font
-  (font-spec :family "Fira Mono" :size 12)
+  (font-spec :name "Source Code Pro:pixelsize=12:foundry=ADBO:weight=semi-bold:slant=normal:width=normal:spacing=100:scalable=true")
   "The font currently in use.")
 
 (defvar +doom-variable-pitch-font

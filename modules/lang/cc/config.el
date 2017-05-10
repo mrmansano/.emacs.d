@@ -162,25 +162,25 @@
   (setq rtags-autostart-diagnostics t)
   (rtags-enable-standard-keybindings))
 
-(def-package! clang-format
-  :after cc-mode
-  :config
-  (global-set-key (kbd "C-c i") 'clang-format-region)
-  (global-set-key (kbd "C-c u") 'clang-format-buffer)
-  (defun my-c-mode-format-on-save ()
-    "Format with clang-format before save"
-    (setq-local clang-format-style "Google")
-    (add-hook 'before-save-hook 'clang-format-buffer nil 'make-it-local)
-    )
-  (add-hook 'c-mode-common-hook #'my-c-mode-format-on-save)
-  )
+;; (def-package! clang-format
+;;   :after cc-mode
+;;   :config
+;;   (global-set-key (kbd "C-c i") 'clang-format-region)
+;;   (global-set-key (kbd "C-c u") 'clang-format-buffer)
+;;   (defun my-c-mode-format-on-save ()
+;;     "Format with clang-format before save"
+;;     (setq-local clang-format-style "Google")
+;;     (add-hook 'before-save-hook 'clang-format-buffer nil 'make-it-local)
+;;     )
+;;   (add-hook 'c-mode-common-hook #'my-c-mode-format-on-save)
+;;   )
 
-(def-package! google-c-style
-  :after cc-mode
-  :config
-  (add-hook 'c-mode-common-hook 'google-set-c-style)
-  ;; Autoindent using google style guide
-  (add-hook 'c-mode-common-hook 'google-make-newline-indent))
+;; (def-package! google-c-style
+;;   :after cc-mode
+;;   :config
+;;   (add-hook 'c-mode-common-hook 'google-set-c-style)
+;;   ;; Autoindent using google style guide
+;;   (add-hook 'c-mode-common-hook 'google-make-newline-indent))
 
 (def-package! srefactor
   :after semantic
