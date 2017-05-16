@@ -14,8 +14,9 @@
 ;; core-ui.el
 (package! highlight-indentation)
 (package! highlight-numbers)
-(package! nlinum)
+(package! hlinum)
 (package! rainbow-delimiters)
+(package! vi-tilde-fringe)
 (package! visual-fill-column)
 
 ;; core-popups.el

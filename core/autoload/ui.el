@@ -10,31 +10,18 @@
      'fullboth)))
 
 ;;;###autoload
-(defun doom/toggle-line-numbers ()
-  "Toggle `nlinum-mode'."
-  (interactive)
-  (nlinum-mode (if nlinum-mode -1 +1)))
-
-;;;###autoload
-(defun doom/reset-theme ()
-  "Reset the color theme currently in use."
-  (interactive)
-  (let ((theme (car-safe custom-enabled-themes)))
-    (when theme
-      (mapc #'disable-theme custom-enabled-themes))
-    (load-theme theme t)))
+(defun doom/toggle-line-numbers (&optional arg)
+  "Toggle `linum-mode'."
+  (interactive "P")
+  (linum-mode (or arg (if linum-mode -1 +1))))
 
 ;;;###autoload
 (defun doom/window-zoom ()
   "Maximize and isolate the current buffer. Activate again to undo this. If the
 window changes before then, the undo expires."
   (interactive)
-  (unless (one-window-p)
-    (setq doom-window-zoomed nil))
-  (if doom-window-zoomed
-      (progn
-        (set-window-configuration doom-window-zoomed)
-        (setq doom-window-zoomed nil))
-    (unless (one-window-p t)
-      (setq doom-window-zoomed (current-window-configuration))
-      (delete-other-windows))))
+  (if (and (one-window-p)
+           (assoc ?_ register-alist))
+      (jump-to-register ?_)
+    (window-configuration-to-register ?_)
+    (delete-other-windows)))

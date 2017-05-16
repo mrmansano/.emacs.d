@@ -5,9 +5,10 @@
 + [-] Work-in-progress
 + [X] Complete
 
-** Planned [6/80]
-+ [0/10] Potential plugins
+** Planned [6/73]
++ [0/11] Potential plugins
   + [ ] [[https://github.com/emacs-lsp/lsp-mode][lsp-mode]]: client for MS Language Server Protocol, keep an eye on this
+  + [ ] lang/javascript: [[https://github.com/NicolasPetton/Indium][indium]] (IDE), keep an eye on this
   + [ ] lang/javascript: [[https://github.com/codesuki/add-node-modules-path][add-node-modules-path]] (adds node_modules to ~exec-path~)
   + [ ] lang/org: [[https://github.com/Malabarba/latex-extra][orgit]] (org links to magit buffers)
   + [ ] lang/org: [[https://github.com/jkitchin/org-ref][org-ref]] (bibtex/citation helper)
@@ -16,10 +17,8 @@
   + [ ] lang/latex: [[**https://github.com/jsinglet/latex-preview-pane][latex-preview-pane]]
   + [ ] lang/julia: [[ https://github.com/dennisog/julia-shell-mode][julia-shell]] (unsure if better than inferior-julia in julia-mode)
   + [ ] lang/python: [[https://github.com/Wilfred/pyimport][pyimport]]
-  + [ ] An image plugin for zooming images at point
-    + https://github.com/mhayashi1120/Emacs-imagex ?
-+ [0/5] New modules
-  + [ ] tools/regex (PCRE regex editor, perhaps use ~re-builder~ & ~pcre2el~?)
+  + [ ] An image plugin for zooming images at point (maybe [[https://github.com/mhayashi1120/Emacs-imagex][emacs-imagex]])
++ [0/4] New modules
   + [ ] app/finance (maybe settle for org-mode tables?)
   + [ ] app/irc
   + [-] app/crm
@@ -89,18 +88,53 @@
     + [ ] rss
     + [ ] twitter
     + [ ] present
-+ [ ] Write ~describe-setting~ for ~def-setting!~ definitions.
-+ [ ] lang/org: restore cursor to sane location after prepending/appending new table cells.
-+ [ ] lang/org: don't move cursor when realigning tables when exiting insert state.
-+ [ ] lang/org: typing certain characters and keys while in a table causes the cell to shrink (like smartparens pairs and keys not bound to self-insert-command)
-+ [ ] Fix invisible buffer-info in modeline for terminal Emacs
-+ [ ] tools/upload: add ~+upload/open-remote-file~ command to open current file on the remote (with TRAMP)
-+ [ ] Make ~doom-visual-bell~ more flexible by basing it's bg color off a face
 
-** 2.0.2 [58/61]
-+ [ ] Update screenshots
-+ [ ] send-to-REPL workflow: does it still work? (see ~:repl~ & ~+eval/repl-send-region~)
-+ [ ] Fix ~0/0~ displaying in modeline (caused by leftover anzu state)
+** 2.0.3 [17/31]
++ [ ] Test ~package-autoremove~
++ [ ] tools/upload: add ~+upload/open-remote-file~ command to open current file
+      on the remote (with TRAMP)
++ [ ] lang/org: fix janky visual line motions (~evil-next-visual-line~, etc)
++ [ ] lang/org: fix janky cursor positioning when manipulating org-table cells
++ [ ] lang/org: don't move cursor when realigning org tables
++ [ ] lang/org: certain characters/keys--when typed in a table--cause the cell
+      to shrink (smartparens pairs & non-self-insert-command, likely)
++ [ ] core-ui: replace (or fix) ~winner-mode~ (too unreliable)
++ [ ] Generalize ~doom-visual-bell~ by basing its background off a face
++ [ ] ui/doom-modeline: extend ~media-info~ segment for other media
++ [ ] Write ~describe-setting~ for ~def-setting!~ definitions.
++ [ ] Fix invisible buffer-info segment in modeline for terminal Emacs
++ [ ] ui/doom-modeline: fix ~0/0~ display in modeline (leftover anzu state)
++ [-] ui/doom: fix nav-flash on evil-multiedit or in eshell/term buffers
++ [-] New module :: tools/regex: PCRE regex editor
++ [X] feature/evil: fix stringp error caused by unintialized state in hideshow
++ [X] feature/evil: extend ~evil-escape~ +to ~evil-multiedit-insert-state~+
++ [X] feature/evil: new code folding system
++ [X] Load ~custom-file~
++ [X] feature/evil: fix evil-multiedit M-d bindings
++ [X] map!: fix ~:after~ and ~:map*~ properties
++ [X] Fix crash in ~doom-update-package~ caused by unreachable dependencies
++ [X] ui/doom: improve nav-flash integration
++ [X] core-popups: properly persist ~popup~ window parameter between sessions
++ [X] core-popups: remove ~:noclone~: simply don't try to clone unreal buffers
++ [X] completion/ivy: flexible column width for ~+ivy/tasks~
++ [X] lang/emacs-lisp: activate flycheck-mode in non-emacs.d files
++ [X] Fix evil normal-mode keybindings in help-mode popups
++ [X] Fix help-mode links opening new popups #ui
+      Added ~:noclone~ property to popup rules
++ [X] Different faces for buffer path and file name #ui
++ [X] Switch from nlinum => linum #ui
++ [X] [[https://github.com/syl20bnr/vi-tilde-fringe][vi-tilde-fringe]]: subtle, vim-ish empty-line indicator #ui
+
+** 2.0.2 [66/66]
++ [X] Update screenshots
++ [X] ui/doom: polish git-gutter fringe bitmaps (deleted bitmap appears truncated)
++ [X] send-to-REPL workflow: does it still work? (see ~:repl~ & ~+eval/repl-send-region~)
++ [X] completion/ivy: restore ag searching (for compressed files)
+  Now ~:ag~, ~:rg~, ~:agcwd~ and ~:rgcwd~
++ [X] ~add-transient-hook!~: add support for appending
++ [X] lang/org: fix org-checkbox-statistics-(todo|done) not respecting underlying faces
++ [X] Make ~:cleanup~ support a BANG modifier (to span workspaces)
++ [X] Rewrote ~:mv~ and ~:rm~
 + [X] completion/ivy: fix ~+ivy:find-file~ -- loss of functionality with coerced literal searches (better to escape regex rather than pass -F to rg)
 + [X] completion/ivy: refactor ~def-counsel-action!~ +into a setting (~def-setting!~)+
   Refactored into ~ivy-do-action!~ macro instead

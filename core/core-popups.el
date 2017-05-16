@@ -27,7 +27,8 @@
 (defvar-local doom-popup-rules nil
   "The shackle rule that caused this buffer to be recognized as a popup.")
 
-(defvar doom-popup-window-parameters '(:noesc :modeline :autokill :autoclose)
+(defvar doom-popup-window-parameters
+  '(:noesc :modeline :autokill :autoclose)
   "A list of window parameters that are set (and cleared) when `doom-popup-mode
 is enabled/disabled.'")
 
@@ -45,45 +46,41 @@ is enabled/disabled.'")
 (def-package! shackle :demand t
   :init
   (setq shackle-default-alignment 'below
+        shackle-default-size 10
         ;;; Baseline popup-window rules
         ;; Several custom properties have been added that are not part of
         ;; shackle and are used by doom's popup system. They are:
         ;;
-        ;;  :noesc      Determines if pressing ESC *inside* the popup should
-        ;;              close it. Used by `doom/popup-close-maybe'.
+        ;;  :noesc      If non-nil, pressing ESC *inside* the popup will close it.
+        ;;              Used by `doom/popup-close-maybe'.
         ;;  :modeline   By default, mode-lines are hidden in popups unless this
         ;;              is non-nil. If it is a symbol, it'll use `doom-modeline'
-        ;;              to fetch a modeline config. Set in `doom-popup-mode'.
-        ;;  :autokill   If non-nil, the buffer in these popups will be killed
-        ;;              when their popup is closed. Used by
-        ;;              `doom*delete-popup-window'
-        ;;  :autoclose  If non-nil, close popup if ESC is pressed from any buffer.
+        ;;              to fetch a modeline config (in `doom-popup-mode').
+        ;;  :autokill   If non-nil, the popup's buffer will be killed when the
+        ;;              popup is closed. Used by `doom*delete-popup-window'.
+        ;;              NOTE `doom/popup-restore' can't restore non-file popups
+        ;;              that have an :autokill property.
+        ;;  :autoclose  If non-nil, close popup if ESC is pressed from outside
+        ;;              the popup window.
         shackle-rules
-        '(("^ ?\\*doom:.+\\*$"      :size 25  :modeline minimal :regexp t :noesc t)
-          ("^ ?\\*doom .+\\*$"      :size 10  :noselect t :regexp t)
-          ("^ *doom message*"       :size 10  :noselect t :autokill t)
-          ("*Metahelp*"             :size 0.5 :autokill t :autoclose t)
-          ("^\\*.+-Profiler-Report .+\\*$" :size 0.3 :regexp t :autokill t)
-          ("*minor-modes*"          :size 0.5 :noselect t :autokill t)
-          ("*eval*"                 :size 16  :noselect t :autokill t :autoclose t)
-          ("*Pp Eval Output*"       :size 16  :noselect t :autokill t :autoclose t)
-          ("*Apropos*"              :size 0.3)
-          ("*Backtrace*"            :size 25  :noselect t)
-          ("*Buffer List*"          :size 20  :autokill t)
-          ("*Help*"                 :size 16)
-          ("*Messages*"             :size 10  :noselect t)
-          ("*Warnings*"             :size 10  :noselect t :autokill t)
-          ("*command-log*"          :size 28  :noselect t :align right)
-          ("*Shell Command Output*" :size 20  :noselect t :autokill t)
-          ("*Occur*"                :size 25  :noselect t :autokill t)
-          ("*Error*"                :size 10  :noselect t :autokill t :autoclose t)
-          ("*Process List*"         :size 10  :noselect t :autokill t :autoclose t)
-          ("*Keys*"                 :size 10  :noselect t)
-          ("^\\*ftp "               :size 8   :noselect t :autokill t :noesc t)
-          (compilation-mode         :size 15  :noselect t :noesc t :autokill t)
-          (eww-mode                 :size 30)
-          (comint-mode              :noesc t)
-          (tabulated-list-mode      :noesc t)))
+        '(("^\\*ftp " :size 8  :noselect t :autokill t :noesc t)
+          ;; doom
+          ("^\\*doom:" :regexp t :size 0.35 :noesc t :select t)
+          ("^\\*doom " :regexp t :noselect t :autokill t :autoclose t)
+          ;; built-in (emacs)
+          (Buffer-menu-mode :size 20 :autokill t)
+          (apropos-mode :size 0.3 :autokill t :autoclose t)
+          (comint-mode :noesc t)
+          (grep-mode :size 25 :noselect t :autokill t)
+          (special-mode :size 12 :noselect t :autokill t)
+          (tabulated-list-mode :noesc t)
+          (profiler-report-mode :size 0.3 :regexp t :autokill t)
+          ("*Backtrace*" :size 20 :noselect t)
+          ("*Warnings*" :noselect t :autokill t)
+          ("*Help*" :size 0.3)
+          ("^\\*.*Shell Command.*\\*$" :regexp t :size 20 :noselect t :autokill t)
+          ("^\\*"  :regexp t :noselect t)
+          ("^ \\*" :regexp t :size 12 :noselect t :autokill t :autoclose t)))
 
   :config
   (if (display-graphic-p)
@@ -113,8 +110,7 @@ for :align t on every rule."
 ;; Tell `window-state-get' and `current-window-configuration' to recognize these
 ;; custom parameters. Helpful for `persp-mode' and persisting window configs
 ;; that have popups in them.
-(push (cons 'no-other-window 'writable) window-persistent-parameters)
-(dolist (param doom-popup-window-parameters)
+(dolist (param (cons 'popup doom-popup-window-parameters))
   (push (cons param 'writable) window-persistent-parameters))
 
 (defvar doom-popup-mode-map
@@ -137,6 +133,10 @@ for :align t on every rule."
   :init-value nil
   :keymap doom-popup-mode-map
   (let ((window (selected-window)))
+    ;; If `doom-popup-rules' isn't set for some reason, try to set it
+    (when-let (plist (and (not doom-popup-rules)
+                          (window-parameter window 'popup)))
+      (setq-local doom-popup-rules (window-parameter window 'popup)))
     ;; Ensure that buffer-opening functions/commands (like
     ;; `switch-to-buffer-other-window' won't use this window).
     (set-window-parameter window 'no-other-window doom-popup-mode)
@@ -187,13 +187,19 @@ for :align t on every rule."
 and setting `doom-popup-rules' within it. Returns the window."
   (unless (doom-popup-p)
     (setq doom-popup-other-window (selected-window)))
-  (let ((plist (or (nth 2 args)
-                   (cond ((windowp (car args))
-                          (shackle-match (window-buffer (car args))))
-                         ((bufferp (car args))
-                          (shackle-match (car args))))))
-        (window (apply orig-fn args)))
-    (unless window
+  (let* ((plist (or (nth 2 args)
+                    (cond ((windowp (car args))
+                           (shackle-match (window-buffer (car args))))
+                          ((bufferp (car args))
+                           (shackle-match (car args))))))
+         (buffer (get-buffer (car args)))
+         (window-min-height (if (plist-get plist :modeline) 4 2))
+         window)
+    (when (and (doom-real-buffer-p buffer)
+               (get-buffer-window-list buffer nil t))
+      (setq plist (append (list :autokill t) plist))
+      (setcar args (clone-indirect-buffer (buffer-name (car args)) nil t)))
+    (unless (setq window (apply orig-fn args))
       (error "No popup window was found for %s: %s" (car args) plist))
     (with-selected-window window
       (unless (eq plist t)
@@ -223,7 +229,7 @@ properties."
     (when (doom-popup-p window)
       (when doom-popup-remember-history
         (setq doom-popup-history (list (doom--popup-data window))))
-      (let ((autokill-p (window-parameter window :autokill)))
+      (let ((autokill-p (plist-get doom-popup-rules :autokill)))
         (with-selected-window window
           (doom-popup-mode -1)
           (when autokill-p
@@ -247,6 +253,26 @@ properties."
       (with-current-buffer buf
         (setq mode-line-format "Commands: d, s, x, u; f, o, 1, 2, m, v; ~, %; q to quit; ? for help."))))
   (advice-add #'buffer-menu :override #'doom*buffer-menu))
+
+
+(after! eshell
+  ;; When eshell runs a visual command (see `eshell-visual-commands'), it spawns
+  ;; a term buffer to run it in, but where it spawns it is the problem.
+
+  ;; By tying buffer life to its process, we ensure that we land back in the
+  ;; eshell buffer after term dies. May cause problems with short-lived
+  ;; processes.
+  ;; FIXME replace with a 'kill buffer' keybinding.
+  (setq eshell-destroy-buffer-when-process-dies t)
+
+  (defun doom*eshell-undedicate-popup (orig-fn &rest args)
+    "Force spawned term buffer to share with the eshell popup (if necessary)."
+    (when (doom-popup-p)
+      (set-window-dedicated-p nil nil)
+      (add-transient-hook! eshell-query-kill-processes :after
+        (set-window-dedicated-p nil t)))
+    (apply orig-fn args))
+  (advice-add #'eshell-exec-visual :around #'doom*eshell-undedicate-popup))
 
 
 (after! evil
@@ -363,9 +389,15 @@ the command buffer."
       (doom--switch-from-popup (find-function-search-for-symbol fun 'defface file)))))
 
 
-;; (after! magit
-;;   ;; Don't open files (from magit) within the magit popup
-;;   (advice-add #'magit-display-file-buffer-traditional :around #'doom*popups-save))
+(after! mu4e
+  (defun doom*mu4e-popup-window (buf height)
+    (doom-popup-buffer buf :size 10 :noselect t)
+    buf)
+  (advice-add #'mu4e~temp-window :override #'doom*mu4e-popup-window))
+
+
+(after! multi-term
+  (setq multi-term-buffer-name "doom:terminal"))
 
 
 (after! neotree
@@ -382,11 +414,9 @@ the command buffer."
     (doom-popup-buffer buf)))
 
 
-(after! mu4e
-  (defun doom*mu4e-popup-window (buf height)
-    (doom-popup-buffer buf :size 10 :noselect t)
-    buf)
-  (advice-add #'mu4e~temp-window :override #'doom*mu4e-popup-window))
+(after! quickrun
+  ;; don't auto-focus quickrun windows, shackle handles that
+  (setq quickrun-focus-p nil))
 
 
 (after! twittering-mode
@@ -419,41 +449,35 @@ you came from."
       '(" *Agenda Commands*" :noselect t)
       '("^\\*Org Agenda"     :regexp t :size 30)
       '("*Org Clock*"        :noselect t)
-      '("^\\*Org Src"        :regexp t :size 0.5 :noesc t)
+      '("^\\*Org Src"        :regexp t :size 0.35 :noesc t)
       '("*Edit Formulas*"    :size 10)
       '("^\\*Org-Babel"      :regexp t :size 25 :noselect t)
       '("^CAPTURE.*\\.org$"  :regexp t :size 20))
 
-    ;; Org tries to do its own popup management, causing buffer/window config
-    ;; armageddon when paired with shackle. To fix this, we must make a couple
-    ;; modifications:
+    ;; Org has its own window management system with a scorched earth philosophy
+    ;; I'm not fond of. i.e. it kills all windows and greedily monopolizes the
+    ;; frame. No thanks. We can do better with shackle's help.
 
-    ;; Suppress `delete-other-windows' in org functions:
+    ;; Save the emacsverse from armageddon by suppressing `delete-other-windows'
+    ;; in org functions.
     (defun doom*suppress-delete-other-windows (orig-fn &rest args)
-      (cl-flet (((symbol-function 'delete-other-windows)
+      (cl-letf (((symbol-function 'delete-other-windows)
                  (symbol-function 'ignore)))
         (apply orig-fn args)))
     (advice-add #'org-add-log-note :around #'doom*suppress-delete-other-windows)
     (advice-add #'org-capture-place-template :around #'doom*suppress-delete-other-windows)
     (advice-add #'org-export--dispatch-ui :around #'doom*suppress-delete-other-windows)
 
-    ;; Tell `org-src-edit' to open another window, which shackle can intercept.
-    (setq org-src-window-setup 'other-window)
-
-    ;; org-edit-src simply clones and narrows the buffer, so we are secretly
-    ;; manipulating the same buffer. Since it never gets killed, we need to
-    ;; treat it specially and clean up after it manually.
-    (defun doom*org-src-switch-to-buffer (&rest args)
-      (let ((window (doom-popup-buffer (car args))))
-        (set-window-dedicated-p window nil)
-        (select-window window)))
+    ;; `org-edit-src-code' simply clones and narrows the buffer to a src block,
+    ;; so we are secretly manipulating the same buffer. Since truely killing it
+    ;; would kill the original org buffer we've got to do things differently.
+    (defun doom*org-src-switch-to-buffer (buffer context)
+      (if (eq org-src-window-setup 'switch-invisibly)
+          (set-buffer buffer)
+        (pop-to-buffer buffer)))
     (advice-add #'org-src-switch-to-buffer :override #'doom*org-src-switch-to-buffer)
 
-    (defun doom*org-src-exit (&rest _)
-      (when doom-popup-mode (doom-popup-mode -1)))
-    (advice-add #'org-edit-src-exit :after #'doom*org-src-exit)
-
-    ;; Ensure todo, agenda, and other popups are opened with shackle
+    ;; Ensure todo, agenda, and other minor popups handed off to shackle.
     (defun doom*org-pop-to-buffer (&rest args)
       (let ((buf (car args)))
         (pop-to-buffer
@@ -468,7 +492,7 @@ you came from."
 
       ;; Hide modeline in org-agenda
       (add-hook 'org-agenda-finalize-hook #'doom-hide-modeline-mode)
-
+      ;; Don't monopolize frame!
       (advice-add #'org-agenda :around #'doom*suppress-delete-other-windows)
 
       (after! evil

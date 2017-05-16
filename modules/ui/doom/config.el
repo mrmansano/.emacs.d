@@ -1,14 +1,14 @@
 ;;; ui/doom/config.el
 
 (defvar +doom-theme 'doom-one
-  "The color theme currently in use.")
+  "The color theme to use.")
 
 (defvar +doom-font
   (font-spec :family "Courier Prime Code" :size 12)
   "The font currently in use.")
 
 (defvar +doom-variable-pitch-font
-  (font-spec :family "Fira Sans" :size 14)
+  (font-spec :family "Fira Sans" :size 13)
   "The font currently in use.")
 
 (defvar +doom-unicode-font
@@ -43,19 +43,17 @@
   :config
   (load-theme +doom-theme t)
 
+  ;; Add file icons to doom-neotree
+  (doom-themes-neotree-config)
+  (setq doom-neotree-enable-variable-pitch t
+        doom-neotree-file-icons 'simple
+        doom-neotree-line-spacing 2)
+
   ;; Since Fira Mono doesn't have an italicized variant, highlight it instead
   (set-face-attribute 'italic nil
                       :weight 'ultra-light
                       :foreground "#ffffff"
                       :background (face-background 'doom-hl-line))
-
-  (defface +doom-folded-face
-    `((((background dark))
-       (:inherit font-lock-comment-face :background ,(doom-color 'black)))
-      (((background light))
-       (:inherit font-lock-comment-face :background ,(doom-color 'light-grey))))
-    "Face to hightlight `hideshow' overlays."
-    :group 'doom)
 
   ;; Dark frames by default
   (when (display-graphic-p)
@@ -72,27 +70,12 @@
 
   (defun +doom|buffer-mode-off ()
     "Disable `doom-buffer-mode' in popup buffers."
-    (when (and doom-buffer-mode
-               (not (get-buffer-window-list)))
+    (when doom-buffer-mode
       (doom-buffer-mode -1)))
   (add-hook 'doom-popup-mode-hook #'+doom|buffer-mode-off)
 
-  (when (featurep! :feature workspaces)
-    (defun +doom|restore-bright-buffers (&rest _)
-      "Restore `doom-buffer-mode' in buffers when `persp-mode' loads a session."
-      (dolist (buf (persp-buffer-list))
-        (with-current-buffer buf
-          (+doom|buffer-mode-on))))
-    (add-hook '+workspaces-load-session-hook #'+doom|restore-bright-buffers))
-
-  ;; Add file icons to doom-neotree
-  (doom-themes-neotree-config)
-  (setq doom-neotree-enable-variable-pitch t
-        doom-neotree-file-icons 'simple
-        doom-neotree-line-spacing 3)
-
-  ;; Add line-highlighting to nlinum
-  (doom-themes-nlinum-config))
+  ;;
+  (add-hook '+workspaces-load-session-hook #'+doom|restore-bright-buffers))
 
 
 ;; Flashes the line around the cursor after any motion command that might
@@ -101,43 +84,68 @@
 (def-package! nav-flash
   :commands nav-flash-show
   :init
-  (defun doom/blink-cursor (&rest _)
+  (defun doom*blink-cursor-maybe (orig-fn &rest args)
     "Blink line, to keep track of the cursor."
     (interactive)
-    (nav-flash-show))
+    (let ((point (point-marker)))
+      (apply orig-fn args)
+      (unless (equal point (point-marker))
+        (doom/blink-cursor))))
 
-  (add-hook! :append
+  (defun doom/blink-cursor (&rest _)
+    (unless (minibufferp)
+      (nav-flash-show)
+      ;; only show in the current window
+      (overlay-put compilation-highlight-overlay 'window (selected-window))))
+
+  (add-hook!
     '(imenu-after-jump-hook evil-jumps-post-jump-hook find-file-hook)
-    'doom/blink-cursor)
+    #'doom/blink-cursor)
 
+  (advice-add #'windmove-do-window-select :around #'doom*blink-cursor-maybe)
   (advice-add #'recenter :after #'doom/blink-cursor)
 
   (after! evil
-    (advice-add #'evil-window-bottom :after #'doom/blink-cursor)
-    (advice-add #'evil-window-middle :after #'doom/blink-cursor)
-    (advice-add #'evil-window-top    :after #'doom/blink-cursor)))
+    (dolist (fn '(evil-window-bottom evil-window-middle evil-window-top))
+      (advice-add fn :around #'doom*blink-cursor-maybe))))
 
 
 (after! hideshow
+  (defface +doom-folded-face
+    `((((background dark))
+       (:inherit font-lock-comment-face :background ,(doom-color 'black)))
+      (((background light))
+       (:inherit font-lock-comment-face :background ,(doom-color 'light-grey))))
+    "Face to hightlight `hideshow' overlays."
+    :group 'doom)
+
   ;; Nicer code-folding overlays
   (setq hs-set-up-overlay
         (lambda (ov)
           (when (eq 'code (overlay-get ov 'hs))
+            (when (featurep 'vimish-fold)
+              (overlay-put
+               ov 'before-string
+               (propertize "…" 'display
+                           (list vimish-fold-indication-mode
+                                 'empty-line
+                                 'vimish-fold-fringe))))
             (overlay-put
              ov 'display (propertize "  [...]  " 'face '+doom-folded-face))))))
 
 
 ;; subtle diff indicators in the fringe
-(after! git-gutter-fringe
-  ;; places the git gutter outside the margins.
-  (setq-default fringes-outside-margins t)
-  ;; thin fringe bitmaps
-  (define-fringe-bitmap 'git-gutter-fr:added
-    [224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224]
-    nil nil 'center)
-  (define-fringe-bitmap 'git-gutter-fr:modified
-    [224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224 224]
-    nil nil 'center)
-  (define-fringe-bitmap 'git-gutter-fr:deleted
-    [0 0 0 0 0 0 0 0 0 0 0 0 0 128 192 224 240 248]
-    nil nil 'center))
+(when (display-graphic-p)
+  (after! git-gutter-fringe
+    ;; places the git gutter outside the margins.
+    (setq-default fringes-outside-margins t)
+    ;; thin fringe bitmaps
+    (fringe-helper-define 'git-gutter-fr:added '(center repeated)
+      "XXX.....")
+    (fringe-helper-define 'git-gutter-fr:modified '(center repeated)
+      "XXX.....")
+    (fringe-helper-define 'git-gutter-fr:deleted 'bottom
+      "X......."
+      "XX......"
+      "XXX....."
+      "XXXX....")))

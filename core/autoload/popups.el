@@ -18,8 +18,7 @@ current window if omitted."
   (declare (indent defun))
   (unless (bufferp buffer)
     (error "%s is not a valid buffer" buffer))
-  (when (and plist (not (plist-member plist :align)))
-    (plist-put plist :align t))
+  (setq plist (append plist (shackle-match buffer)))
   (shackle-display-buffer
    buffer
    nil (or plist (shackle-match buffer))))
@@ -40,8 +39,8 @@ possible rules."
 ;;;###autoload
 (defun doom/popup-restore ()
   "Restore the last open popups. If the buffers have been killed, and
-represented real files, they will be restored. Special buffers or buffers with
-non-nil :autokill properties will not be.
+represented real files, they will be restored. Dead special buffers or buffers
+with non-nil :autokill properties will not be.
 
 Returns t if popups were restored, nil otherwise."
   (interactive)
@@ -50,10 +49,13 @@ Returns t if popups were restored, nil otherwise."
   (let (any-p)
     (dolist (spec doom-popup-history)
       (let ((buffer (get-buffer (car spec)))
-            (path   (plist-get (cdr spec) :file))
+            (file   (plist-get (cdr spec) :file))
             (rules  (plist-get (cdr spec) :rules)))
-        (when (and (not buffer) path)
-          (setq buffer (find-file-noselect path t)))
+        (when (and (not buffer) file)
+          (setq buffer
+                (if-let (buf (get-file-buffer file))
+                    (clone-indirect-buffer (buffer-name buf) nil t)
+                  (find-file-noselect file t))))
         (when (and buffer (apply #'doom-popup-buffer buffer rules) (not any-p))
           (setq any-p t))))
     (when any-p
@@ -105,7 +107,7 @@ only close popups that have an :autoclose property in their rule (see
   "Close the current popup *if* its window doesn't have a noesc parameter."
   (interactive)
   (let ((window (selected-window)))
-    (if (window-parameter window :noesc)
+    (if (plist-get doom-popup-rules :noesc)
         (call-interactively (if (featurep 'evil)
                                 #'evil-force-normal-state
                               #'keyboard-escape-quit))
@@ -114,7 +116,8 @@ only close popups that have an :autoclose property in their rule (see
 ;;;###autoload
 (defun doom/popup ()
   "Display currently selected buffer in a popup window."
-  (doom-popup-buffer (current-buffer) :align t))
+  (interactive)
+  (doom-popup-buffer (current-buffer) :align t :autokill t))
 
 (defun doom--popup-data (window)
   (let ((buffer (window-buffer window)))

@@ -46,9 +46,6 @@
  :e "C-j" #'evil-window-down
  :e "C-k" #'evil-window-up
  :e "C-l" #'evil-window-right
- ;; Temporary escape into emacs mode
- :e [C-escape] #'evil-normal-state
- :n [C-escape] #'evil-emacs-state
  ;; Switching tabs (workspaces)
  "M-1"  (λ! (+workspace/switch-to 0))
  "M-2"  (λ! (+workspace/switch-to 1))
@@ -61,8 +58,10 @@
  "M-9"  (λ! (+workspace/switch-to 8))
  "M-0"  #'+workspace/switch-to-last
 
- "M-r"  #'+eval/buffer
- "M-b"  #'+eval/build
+ :n "M-r"   #'+eval/buffer
+ :v "M-r"   #'+eval/region
+ :v "M-S-r" #'+eval/region-and-replace
+ :n "M-b"   #'+eval/build
 
  [M-backspace]  #'doom/backward-kill-to-bol-and-indent
  "M-a"          #'mark-whole-buffer
@@ -97,31 +96,29 @@
    :desc "Open file explorer"       :n "n"  #'+evil/neotree
    :desc "Insert from kill ring"    :n "y"  #'counsel-yank-pop
    :desc "Switch project"           :n "p"  #'projectile-switch-project
-   :desc "Find snippet for mode"    :n "s"  #'yas-visit-snippet-file
-   :desc "Find snippet"             :n "S"  #'+hlissner/find-in-snippets
    :desc "Execute in Emacs mode"    :n "\\" #'evil-execute-in-emacs-state
    :desc "Switch to Emacs mode"     :n "|"  #'evil-emacs-state
    ;; Since I've remapped C-h...
    :desc "Help"                     :n "h"  #'help-command
 
-   (:desc "Session/Workspace"
-     :prefix "w"
-     :desc "Load last session"      :n "l" (λ! (+workspace/load-session))
-     :desc "Load session"           :n "L" #'+workspace/load-session
-     :desc "Save session"           :n "s" #'+workspace/save-session
-     :desc "Delete session"         :n "X" #'+workspace/kill-session
-     :desc "Load workspace"         :n "L" #'+workspace/load
-     :desc "Save workspace"         :n "L" #'+workspace/save
-     :desc "Delete workspace"       :n "x" #'+workspace/delete
-     :desc "Switch workspace"       :n "." #'+workspace/switch-to
-     :desc "Kill all buffers"       :n "x" #'doom/kill-all-buffers)
-
-   (:desc "Quit"
+   (:desc "quit"
      :prefix "q"
      :desc "Quit"                   :n "q" #'evil-save-and-quit
      :desc "Quit (forget session)"  :n "Q" #'+workspace/kill-session-and-quit)
 
-   (:desc "Toggle"
+   (:desc "session"
+     :prefix "s"
+     :desc "Kill all buffers"         :n "k" #'doom/kill-all-buffers
+     :desc "Load last session"        :n "r" (λ! (+workspace/load-session))
+     :desc "Load workspace from file" :n "l" #'+workspace/load
+     :desc "Save workspace to file"   :n "s" #'+workspace/save
+     :desc "Switch workspace"         :n "." #'+workspace/switch-to
+     :desc "Delete this workspace"    :n "x" #'+workspace/delete
+     :desc "Load session"             :n "L" #'+workspace/load-session
+     :desc "Autosave current session" :n "S" #'+workspace/save-session
+     :desc "Delete session"           :n "X" #'+workspace/kill-session)
+
+   (:desc "toggle"
      :prefix "t"
      :desc "Spell check"            :n "s" #'flyspell-mode
      :desc "Line numbers"           :n "l" #'doom/toggle-line-numbers
@@ -129,16 +126,10 @@
      :desc "Indent guides"          :n "i" #'highlight-indentation-mode
      :desc "Indent guides (column)" :n "I" #'highlight-indentation-current-column-mode
      :desc "Impatient mode"         :n "h" #'+present/impatient-mode
-     :desc "Big mode"               :n "b" #'+present/big-mode)
+     :desc "Big mode"               :n "b" #'+present/big-mode
+     :desc "Git time machine"       :n "t" #'git-timemachine-toggle)
 
-   (:desc "Tmux/Terminal"
-     :prefix "T"
-     :desc "cd to here"             :n "." #'+tmux/cd-to-here
-     :desc "cd to project"          :n "/" #'+tmux/cd-to-project
-     ;; TODO :desc "ssh into..."    :n "/" '+tmux/ssh
-     :desc "send selection"         :v "r" #'+tmux/send-region)
-
-   (:desc "SSH/FTP"
+   (:desc "remote"
      :prefix "u"
      :desc "Upload local"           :n "u" #'+upload/local
      :desc "Upload local (force)"   :n "U" (λ! (+upload/local t))
@@ -147,9 +138,23 @@
      :desc "Browse remote files"    :n "." #'+upload/browse
      :desc "Detect remote changes"  :n "." #'+upload/check-remote)
 
-   (:desc "Open with"
+   (:desc "open"
      :prefix "o"
-     :desc "Default browser"        :n "b" #'browse-url-of-file
+     :desc "Default browser"         :n  "o" #'browse-url-of-file
+     :desc "Debugger"                :n  "d" #'+debug/open
+     :desc "Build tasks"             :n  "b" #'+eval/build
+     :desc "REPL"                    :n  "r" #'+eval:repl
+     :desc "Send to REPL"            :v  "r" #'+eval:repl
+     :desc "Sudo"                    :n  "s" #'doom/sudo-this-file
+     :desc "Terminal"                :n  "t" #'+term/popup
+     :desc "Terminal @ project root" :n  "T" #'+term/popup-in-project
+
+     ;; applications
+     :desc "APP: elfeed"            :n "r"   #'=rss
+     :desc "APP: email"             :n "e"   #'=email
+     :desc "APP: twitter"           :n "t"   #'=twitter
+
+     ;; macos
      (:when IS-MAC
        :desc "Reveal in Finder"          :n "o" #'+macos/reveal
        :desc "Reveal project in Finder"  :n "O" #'+macos/reveal-project
@@ -158,29 +163,22 @@
        :desc "Send to Launchbar"         :n "l" #'+macos/send-to-launchbar
        :desc "Send project to Launchbar" :n "L" #'+macos/send-project-to-launchbar))
 
-   (:desc "Code tools"
-     :prefix "c"
-     :desc "Build"                  :n  "b"  #'+eval/build
-     :desc "Open/Send to REPL"      :nv "r"  #'+eval/repl
-     :desc "Open debugger"          :n  "R"  #'+debug/open)
-
    (:desc "Personal"
      :prefix "SPC"
      :desc "Browse emacs.d"         :n "."   #'+hlissner/browse-emacsd
      :desc "Find file in emacs.d"   :n "/"   #'+hlissner/find-in-emacsd
      :desc "Browse dotfiles"        :n ">"   #'+hlissner/browse-dotfiles
      :desc "Find file in dotfiles"  :n "?"   #'+hlissner/find-in-dotfiles
-     :desc "Reload theme"           :n "R"   #'doom/reset-theme
+     :desc "Reload theme"           :n "R"   #'+doom/reset-theme
      ;; Org notes
      :desc "Browse notes"           :n "n"   #'+hlissner/browse-notes
      :desc "Find file in notes"     :n "N"   #'+hlissner/find-in-notes
      :desc "Browse project notes"   :n "p"   #'+org/browse-notes-for-project
      :desc "Browse mode notes"      :n "m"   #'+org/browse-notes-for-major-mode
      :desc "Org Capture"            :n "SPC" #'+org/capture
-     ;; applications
-     :desc "APP: elfeed"            :n "r"   #'=rss
-     :desc "APP: email"             :n "e"   #'=email
-     :desc "APP: twitter"           :n "t"   #'=twitter
+     ;; misc
+     :desc "Find snippet for mode"  :n "s"  #'yas-visit-snippet-file
+     :desc "Find snippet"           :n "S"  #'+hlissner/find-in-snippets
      ))
 
  (:localleader
@@ -192,11 +190,6 @@
   (:desc "Unit tests"  :prefix "t"))
 
  ;;; Evil-esque bindings
- ;; Yank to EOL
- :n  "Y"  "y$"
- ;; Folding
- :n  "zr" #'+evil:open-folds-recursively
- :n  "zm" #'+evil:close-folds-recursively
  :n  "zx" #'doom/kill-this-buffer
  ;; Buffers
  :n  "ZX" #'bury-buffer
@@ -222,7 +215,6 @@
  :nv "K"  #'smart-up
  :m  "gd" #'+jump/definition
  :m  "gD" #'+jump/references
- :n  "gf" #'find-file-at-point
  :n  "gp" #'+evil/reselect-paste
  :n  "gc" #'evil-commentary
  :n  "gx" #'evil-exchange
@@ -233,13 +225,11 @@
  :m  "g[" #'smart-backward
  :v  "@"  #'+evil:macro-on-all-lines
  :n  "g@" #'+evil:macro-on-all-lines
- ;; Repeat in visual mode (buggy)
+ ;; repeat in visual mode (buggy)
  :v  "."  #'evil-repeat
- :v  "<"  #'+evil/visual-dedent     ; vnoremap < <gv
- :v  ">"  #'+evil/visual-indent     ; vnoremap > >gv
- ;; undo/redo for regions (buggy)
- :nv "u"   #'undo-tree-undo
- :nv "C-r" #'undo-tree-redo
+ ;; don't leave visual mode after shifting
+ :v  "<"  #'+evil/visual-dedent  ; vnoremap < <gv
+ :v  ">"  #'+evil/visual-indent  ; vnoremap > >gv
  ;; paste from recent yank register (which isn't overwritten)
  :v  "C-p" "\"0p"
 
@@ -280,9 +270,24 @@
    :i "C-p"   (λ! (let ((company-selection-wrap-around t))
                     (call-interactively 'company-dabbrev-code)
                     (company-select-previous-or-abort))))
- ;; evil-visual-star
- :v  "*"   #'evil-visualstar/begin-search-forward
- :v  "#"   #'evil-visualstar/begin-search-backward
+ ;; evil-mc
+ :n "M-d" #'evil-mc-make-cursor-here
+ (:after evil-mc
+   :map evil-mc-key-map
+   :n "M-D" #'+evil/mc-toggle-cursors)
+ ;; evil-multiedit
+ :v "M-d"   #'evil-multiedit-match-and-next
+ :v "M-D"   #'evil-multiedit-match-and-prev
+ :v "C-M-d" #'evil-multiedit-restore
+ :v "R"     #'evil-multiedit-match-all
+ (:after evil-multiedit
+   (:map evil-multiedit-state-map
+     "M-d" #'evil-multiedit-match-and-next
+     "M-D" #'evil-multiedit-match-and-prev
+     "RET" #'evil-multiedit-toggle-or-restrict-region)
+   (:map (evil-multiedit-state-map evil-multiedit-insert-state-map)
+     "C-n" #'evil-multiedit-next
+     "C-p" #'evil-multiedit-prev))
  ;; evil-surround
  :v  "S"   #'evil-surround-region
  :o  "s"   #'evil-surround-edit
@@ -292,8 +297,6 @@
  :v  "V"   #'er/contract-region
  ;; rotate-text
  :n  "!"   #'rotate-text
- ;; evil-matchit
- :m  "%"   #'evilmi-jump-items
  ;; hide-show/evil-matchit
  :nv "<tab>" #'+evil/matchit-or-toggle-fold
 
@@ -301,7 +304,13 @@
  (:map help-mode-map
    :n "]]"  #'help-go-forward
    :n "[["  #'help-go-back
-   :n "o"   #'ace-link-help))
+   :n "o"   #'ace-link-help)
+
+ (:map help-map
+   "l" #'find-library
+   "L" #'view-lossage
+   "h" #'describe-face  ; overwrite `view-hello-file'
+   "g" nil)) ; annoying to accidentally trigger
 
 
 ;;
@@ -321,18 +330,6 @@
       :i "C-e" #'doom/forward-to-last-non-comment-or-eol
       :i "C-u" #'doom/backward-kill-to-bol-and-indent
 
-      ;; Restore 'dumb' indentation to the tab key. This rustles a lot of peoples'
-      ;; jimmies, apparently, but it's how I like it.
-      :i "<tab>"     #'doom/dumb-indent
-      :i "<backtab>" #'doom/dumb-dedent
-      :i "<C-tab>"   #'indent-for-tab-command
-      :i "<A-tab>"   (λ! (insert "\t"))
-      ;; 'smart' indentation for lisp modes
-      (:after lisp-mode
-        (:map lisp-mode-map       :i [remap doom/dumb-indent] #'indent-for-tab-command))
-      (:after elisp-mode
-        (:map emacs-lisp-mode-map :i [remap doom/dumb-indent] #'indent-for-tab-command))
-
       ;; textmate-esque newline insertion
       :i [M-return]     #'evil-open-below
       :i [S-M-return]   #'evil-open-above
@@ -342,8 +339,6 @@
       ;; Emacsien motions for insert mode
       :i "C-b" #'backward-word
       :i "C-f" #'forward-word
-      ;; escape from insert mode (more responsive than using key-chord-define)
-      :irv "C-g" #'evil-normal-state
 
       ;; Highjacks space/backspace to:
       ;;   a) balance spaces inside brackets/parentheses ( | ) -> (|)
@@ -352,6 +347,10 @@
       :i "SPC"                          #'doom/inflate-space-maybe
       :i [remap delete-backward-char]   #'doom/deflate-space-maybe
       :i [remap newline]                #'doom/newline-and-indent
+
+      (:after org-mode
+        (:map org-mode-map
+          :i [remap doom/inflate-space-maybe] #'org-self-insert-command))
 
       ;; Make ESC quit all the things
       (:map (minibuffer-local-map
@@ -375,10 +374,5 @@
         "M-z" #'doom-minibuffer-undo)
 
       (:after view
-        (:map view-mode-map "<escape>" #'View-quit-all))
-
-      (:map help-map
-        "l" #'find-library
-        "h" #'describe-face  ; overwrite `view-hello-file'
-        "g" nil))
+        (:map view-mode-map "<escape>" #'View-quit-all)))
 

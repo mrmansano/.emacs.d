@@ -15,7 +15,7 @@
 ;; Autoloaded functions are in core/autoload/*.el and modules/*/*/autoload.el or
 ;; modules/*/*/autoload/*.el.
 
-(defvar doom-version "2.0.1"
+(defvar doom-version "2.0.2"
   "Current version of DOOM emacs.")
 
 (defvar doom-debug-mode (or (getenv "DEBUG") init-file-debug)
@@ -99,7 +99,6 @@ there are problems.")
  abbrev-file-name             (concat doom-local-dir "abbrev.el")
  auto-save-list-file-name     (concat doom-cache-dir "autosave")
  backup-directory-alist       (list (cons "." (concat doom-cache-dir "backup/")))
- custom-file                  (concat doom-etc-dir "custom.el")
  pcache-directory             (concat doom-cache-dir "pcache/")
  server-auth-dir              (concat doom-cache-dir "server/")
  shared-game-score-directory  (concat doom-etc-dir "shared-game-score/")
@@ -107,8 +106,11 @@ there are problems.")
  tramp-backup-directory-alist backup-directory-alist
  tramp-persistency-file-name  (concat doom-cache-dir "tramp-persistency.el")
  url-cache-directory          (concat doom-cache-dir "url/")
- url-configuration-directory  (concat doom-etc-dir "url/")
- undo-tree-history-directory-alist (list (cons "." (concat doom-cache-dir "undo-tree-hist/"))))
+ url-configuration-directory  (concat doom-etc-dir "url/"))
+
+;; move custom defs out of init.el
+(setq custom-file (concat doom-etc-dir "custom.el"))
+(load custom-file t t)
 
 ;; be quiet at startup
 (advice-add #'display-startup-echo-area-message :override #'ignore)
@@ -155,7 +157,8 @@ enable multiple minor modes for the same regexp.")
     (require 'core-packages (concat doom-core-dir "core-packages")))
   (eval-when-compile
     (doom-initialize))
-  (setq load-path (eval-when-compile load-path))
+  (setq load-path (eval-when-compile load-path)
+        doom--package-load-path (eval-when-compile doom--package-load-path))
 
   ;;; Let 'er rip
   (require 'core-lib)

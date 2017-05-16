@@ -7,11 +7,10 @@
 (def-package! flycheck
   :commands (flycheck-mode flycheck-list-errors flycheck-buffer)
   :config
-  (setq flycheck-indication-mode 'right-fringe ; git-gutter is in the left fringe
-        ;; Removed checks on idle/change for snappiness
-        flycheck-check-syntax-automatically '(save mode-enabled)
-        flycheck-highlighting-mode 'symbols
-        flycheck-disabled-checkers '(emacs-lisp-checkdoc make))
+  (setq ;; because git-gutter is in the left fringe
+        flycheck-indication-mode 'right-fringe
+        ;; Emacs feels snappier without checks on idle/change
+        flycheck-check-syntax-automatically '(save mode-enabled))
 
   (set! :popup " ?\\*Flycheck.+\\*" :size 14 :noselect t :regexp t)
 
@@ -22,13 +21,14 @@
         :n "k"   #'flycheck-error-list-previous-error
         :n "RET" #'flycheck-error-list-goto-error)
 
-  (define-fringe-bitmap 'flycheck-fringe-bitmap-double-arrow
-    [0 0 0 0 0 4 12 28 60 124 252 124 60 28 12 4 0 0 0 0])
+  (when (fboundp 'define-fringe-bitmap)
+    (define-fringe-bitmap 'flycheck-fringe-bitmap-double-arrow
+      [0 0 0 0 0 4 12 28 60 124 252 124 60 28 12 4 0 0 0 0]))
 
   (after! evil
     ;; Flycheck buffer on ESC in normal mode.
     (defun +syntax-checkers|flycheck-buffer ()
-      (if flycheck-mode (flycheck-buffer)))
+      (if flycheck-mode (ignore-errors (flycheck-buffer))))
     (add-hook '+evil-esc-hook #'+syntax-checkers|flycheck-buffer)))
 
 

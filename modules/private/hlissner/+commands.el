@@ -21,7 +21,7 @@
 ;; TODO (ex! "dbu[se]"     'doom:db-select)
 ;; TODO (ex! "go[ogle]"    'doom:google-search)
 (ex! "http"        'httpd-start)            ; start http server
-(ex! "repl"        '+eval/repl)             ; invoke or send to repl
+(ex! "repl"        '+eval:repl)             ; invoke or send to repl
 ;; TODO (ex! "rx"          'doom:regex)             ; open re-builder
 (ex! "sh[ell]"     '+eshell:run)
 (ex! "t[mux]"      '+tmux:run)              ; send to tmux
@@ -52,8 +52,10 @@
 
 ;; Project navigation
 (ex! "a"           'projectile-find-other-file)
-(ex! "f[in]d"      '+ivy:file-search)
-(ex! "f[in]dcwd"   '+ivy:file-search-cwd)
+(ex! "ag"          '+ivy:ag)
+(ex! "agc[wd]"     '+ivy:ag-cwd)
+(ex! "rg"          '+ivy:rg)
+(ex! "rgc[wd]"     '+ivy:rg-cwd)
 (ex! "cd"          '+hlissner:cd)
 (ex! "sw[iper]"    '+ivy:swiper)     ; in-file search
 
@@ -64,8 +66,8 @@
 (ex! "todo"        '+ivy:todo)
 
 ;; File operations
-(ex! "mv"          '+evil:file-move)
-(ex! "rm"          '+evil:file-delete)
+(ex! "mv"          '+evil:move-this-file)
+(ex! "rm"          '+evil:delete-this-file)
 
 ;; Sessions/tabs
 (ex! "sclear"      '+workspace/kill-session)

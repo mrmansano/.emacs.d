@@ -1,6 +1,6 @@
 ;; core-ui.el --- draw me like one of your French editors
 
-(defvar doom-ui-fringe-size '3 "Default fringe width")
+(defvar doom-ui-fringe-size '4 "Default fringe width")
 
 (setq-default
  bidi-display-reordering nil ; disable bidirectional text for tiny performance boost
@@ -23,11 +23,8 @@
  mouse-yank-at-point t          ; middle-click paste at point, not at click
  resize-mini-windows 'grow-only ; Minibuffer resizing
  show-help-function nil         ; hide :help-echo text
- show-paren-delay 0.075
- show-paren-highlight-openparen t
- show-paren-when-point-inside-paren t
  split-width-threshold nil      ; favor horizontal splits
- uniquify-buffer-name-style nil
+ uniquify-buffer-name-style 'forward
  use-dialog-box nil             ; always avoid GUI
  visible-cursor nil
  x-stretch-cursor nil
@@ -79,12 +76,21 @@ local value, whether or not it's permanent-local. Therefore, we cycle
   (when doom-hide-modeline-mode
     (doom-hide-modeline-mode -1)
     (doom-hide-modeline-mode +1)))
-(add-hook 'after-change-major-mode-hook 'doom|hide-modeline-mode-reset)
+(add-hook 'after-change-major-mode-hook #'doom|hide-modeline-mode-reset)
+
+;; no modeline in completion popups
+(add-hook 'completion-list-mode-hook #'doom-hide-modeline-mode)
 
 ;; undo/redo changes to Emacs' window layout
 (defvar winner-dont-bind-my-keys t) ; I'll bind keys myself
 (require 'winner)
 (add-hook 'window-setup-hook #'winner-mode)
+
+;; highlight matching delimiters
+(setq show-paren-delay 0.1
+      show-paren-highlight-openparen t
+      show-paren-when-point-inside-paren t)
+(show-paren-mode +1)
 
 
 ;;
@@ -110,16 +116,8 @@ local value, whether or not it's permanent-local. Therefore, we cycle
 ;; Plugins
 ;;
 
-;; I modified the built-in `hideshow' package to enable itself when needed. A
-;; better, more vim-like code-folding plugin would be the `origami' plugin, but
-;; until certain breaking bugs are fixed in it, I won't switch over.
 (def-package! hideshow ; built-in
   :commands (hs-minor-mode hs-toggle-hiding hs-already-hidden-p)
-  :init
-  (defun doom*autoload-hideshow ()
-    (unless (bound-and-true-p hs-minor-mode)
-      (hs-minor-mode 1)))
-  (advice-add #'evil-toggle-fold :before #'doom*autoload-hideshow)
   :config
   (setq hs-hide-comments-when-hiding-all nil))
 
@@ -179,36 +177,33 @@ file."
 
 ;; Line highlighting
 (def-package! hl-line ; built-in
+  :init
+  (add-hook! (linum-mode nlinum-mode) #'hl-line-mode)
   :config
   ;; stickiness doesn't play nice with emacs 25+
   (setq hl-line-sticky-flag nil
-        global-hl-line-sticky-flag nil))
+        global-hl-line-sticky-flag nil)
 
-;; Line number column. A faster (or equivalent, in the worst case) line number
-;; plugin than the built-in `linum'.
-(def-package! nlinum
-  :commands nlinum-mode
-  :preface
-  (defvar linum-format "%3d ")
-  (defvar nlinum-format "%4d ")
+  ;; acts weird with evil visual mode, so disable it temporarily
+  (defun doom|hl-line-off () (hl-line-mode -1))
+  (after! evil
+    (add-hook! 'hl-line-mode-hook
+      (when hl-line-mode
+        (add-hook 'evil-visual-state-entry-hook #'doom|hl-line-off nil t)
+        (add-hook 'evil-visual-state-exit-hook #'hl-line-mode nil t)))))
+
+;; Line numbers
+(def-package! linum
+  :commands linum-mode
+  :preface (defvar linum-format "%4d ")
   :init
-  (add-hook!
-    (markdown-mode prog-mode scss-mode web-mode conf-mode groovy-mode
-     nxml-mode snippet-mode php-mode)
-    #'nlinum-mode)
+  (add-hook! (prog-mode text-mode)
+    (unless (eq major-mode 'org-mode)
+      (linum-mode +1)))
 
   :config
-  (defun doom*nlinum-flush (&rest _)
-    "Fix nlinum margins after a change in font."
-    (dolist (buffer (doom-visible-buffers))
-      (with-current-buffer buffer
-        (when nlinum-mode (nlinum--flush)))))
-  (advice-add #'set-frame-font :after #'doom*nlinum-flush)
-
-  ;; Optimization: calculate line number column width beforehand
-  (add-hook! nlinum-mode
-    (setq nlinum--width (length (save-excursion (goto-char (point-max))
-                                                (format-mode-line "%l"))))))
+  (require 'hlinum) ; highlight current line number
+  (hlinum-activate))
 
 ;; Helps us distinguish stacked delimiter pairs. Especially in parentheses-drunk
 ;; languages like Lisp.
@@ -217,10 +212,16 @@ file."
   :config (setq rainbow-delimiters-max-face-count 3)
   :init (add-hook 'lisp-mode-hook #'rainbow-delimiters-mode))
 
+;; indicators for empty lines past EOF
+(def-package! vi-tilde-fringe
+  :when (display-graphic-p)
+  :demand t
+  :config (global-vi-tilde-fringe-mode t))
+
 ;; For a distractions-free-like UI, that dynamically resizes margets and can
 ;; center a buffer.
 (def-package! visual-fill-column
-  :commands (visual-fill-column-mode)
+  :commands visual-fill-column-mode
   :config
   (setq-default visual-fill-column-center-text nil
                 visual-fill-column-width fill-column))

@@ -57,6 +57,11 @@ modes are active and the buffer is read-only.")
       savehist-additional-variables '(kill-ring search-ring regexp-search-ring))
 (savehist-mode 1)
 
+;; Branching & persistent undo
+(require 'undo-tree)
+(setq undo-tree-auto-save-history t
+      undo-tree-history-directory-alist (list (cons "." (concat doom-cache-dir "undo-tree-hist/"))))
+
 ;; Keep track of recently opened files
 (require 'recentf)
 (setq recentf-save-file (concat doom-cache-dir "recentf")
@@ -67,7 +72,7 @@ modes are active and the buffer is read-only.")
       recentf-filename-handlers '(abbreviate-file-name))
 (quiet! (recentf-mode 1))
 
-;; Ediff
+;; Ediff: use existing frame instead of creating a new one
 (add-hook! ediff-load
   (setq ediff-diff-options           "-w"
         ediff-split-window-function  #'split-window-horizontally

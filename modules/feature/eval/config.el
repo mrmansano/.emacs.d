@@ -1,9 +1,5 @@
 ;;; feature/eval/config.el
 
-;; This module creates a centralized way of invoking/sending selections to REPLs
-;; (with `repl-toggle'), building projects/files, and running code (with
-;; `quickrun'), revealing its output in a popup window.
-
 ;;
 ;; Code building
 ;;
@@ -93,15 +89,13 @@ invokes the repl. Takes the same arguements as `rtog/add-repl'."
              quickrun-compile-only
              quickrun-replace-region)
   :init
-  ;; Use standard linum-mode for quickrun eval windows; so we can have different
-  ;; rules for it. Plus, hide modeline in it.
-  (add-hook 'quickrun--mode-hook #'linum-mode)
+  (add-hook! 'quickrun--mode-hook (linum-mode +1))
 
   :config
-  (set! :popup "*quickrun*" :size 10 :noesc t :autokill t :autoclose t)
-
-  ;; don't auto-focus quickrun windows. Shackle handles that for us.
-  (setq quickrun-focus-p nil)
+  (set! :popup
+    '("*quickrun*"       :size 10 :noesc t :autokill t :autoclose t)
+    '("*eval*"           :size 12 :noselect t :autokill t :autoclose t)
+    '("*Pp Eval Output*" :size 12 :noselect t :autokill t :autoclose t))
 
   (defun +eval*quickrun-auto-close (&rest _)
     "Allows us to silently re-run quickrun from within the quickrun buffer."

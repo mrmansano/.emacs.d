@@ -11,7 +11,7 @@
     (when last-refresh
       (setq doom--last-refresh last-refresh)))
   (when (or (not doom--last-refresh)
-            (> (nth 1 (time-since doom--last-refresh)) 600))
+            (> (nth 1 (time-since doom--last-refresh)) 900))
     (package-refresh-contents)
     (persistent-soft-store
      'last-pkg-refresh (setq doom--last-refresh (current-time))
@@ -22,15 +22,17 @@
   "Get which backend the package NAME was installed with. Can either be elpa,
 quelpa or nil (if not installed)."
   (doom-initialize)
-  (unless (quelpa-setup-p)
-    (error "Could not initialize quelpa"))
   (cond ((let ((plist (cdr (assq name doom-packages))))
            (and (not (plist-get plist :pin))
+                (or (quelpa-setup-p)
+                    (error "Could not initialize quelpa"))
                 (or (assq name quelpa-cache)
                     (plist-get plist :recipe))))
          'quelpa)
         ((assq name package-alist)
-         'elpa)))
+         'elpa)
+        (t
+         (error "%s package not installed" name))))
 
 ;;;###autoload
 (defun doom-package-outdated-p (name)
@@ -46,7 +48,7 @@ list of the package."
                (let ((recipe (assq name quelpa-cache))
                      (dir (expand-file-name (symbol-name name) quelpa-build-dir))
                      (inhibit-message t))
-                 (if-let (ver (and (quelpa-setup-p) (quelpa-checkout recipe dir)))
+                 (if-let (ver (quelpa-checkout recipe dir))
                      (version-to-list ver)
                    old-version)))
               ('elpa
@@ -70,8 +72,6 @@ the packages relevant to that backend.
 Warning: this function is expensive; it re-evaluates all of doom's config files.
 Be careful not to use it in a loop."
   (doom-initialize-packages t)
-  (unless (quelpa-setup-p)
-    (error "Could not initialize quelpa"))
   (delq nil
         (mapcar (lambda (pkgsym)
                   (or (assq pkgsym doom-packages)
@@ -155,7 +155,8 @@ example; the package name can be omitted)."
   (doom-initialize-packages)
   (when (package-installed-p name)
     (user-error "%s is already installed, skipping" name))
-  (let ((inhibit-message (not doom-debug-mode))
+  (let ((plist (or plist (cdr (assq name doom-packages))))
+        (inhibit-message (not doom-debug-mode))
         (recipe (plist-get plist :recipe)))
     (cond (recipe (quelpa recipe))
           (t (package-install name))))
@@ -169,20 +170,14 @@ appropriate."
   (unless (package-installed-p name)
     (user-error "%s isn't installed" name))
   (when (doom-package-outdated-p name)
-    (let ((inhibit-message (not doom-debug-mode))
-          quelpa-modified-p)
+    (let ((inhibit-message (not doom-debug-mode)))
       (pcase (doom-package-backend name)
         ('quelpa
          (let ((quelpa-upgrade-p t))
-           (quelpa (assq name quelpa-cache))
-           (setq quelpa-modified-p t)))
+           (quelpa (assq name quelpa-cache))))
         ('elpa
-         (let ((desc    (cadr (assq name package-alist)))
-               (archive (cadr (assq name package-archive-contents))))
-           (package-install-from-archive archive)
-           (delete-directory (package-desc-dir desc) t))))
-      (when quelpa-modified-p
-        (quelpa-save-cache)))
+         (doom-delete-package name t)
+         (doom-install-package name))))
     (version-list-=
      (package-desc-version (cadr (assq name package-alist)))
      (package-desc-version (cadr (assq name package-archive-contents))))))
@@ -192,9 +187,8 @@ appropriate."
   (doom-initialize)
   (unless (package-installed-p name)
     (user-error "%s isn't installed" name))
-  (let ((desc (cadr (assq name package-alist)))
-        (inhibit-message t))
-    (package-delete desc force-p))
+  (let ((inhibit-message (not doom-debug-mode)))
+    (package-delete (cadr (assq name package-alist)) force-p))
   (not (package-installed-p name)))
 
 

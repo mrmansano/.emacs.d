@@ -46,6 +46,10 @@
   "Run everytime `org-mode' is enabled."
   (setq line-spacing 1)
 
+  ;; show-paren-mode causes problems for org-indent-mode
+  (make-local-variable 'show-paren-mode)
+  (setq show-paren-mode nil)
+
   (visual-line-mode +1)
   (when (and (featurep 'evil) evil-mode)
     (evil-org-mode +1))
@@ -186,21 +190,27 @@
             (,(concat "<\\(http://.+\\." ext-regexp "\\)>") . 1))))
 
   ;;; Custom fontification
-  ;; I like how org-mode fontifies checked TODOs and want this to extend to
-  ;; checked checkbox items, so we remove the old checkbox highlight rule...
-  (font-lock-remove-keywords
-   'org-mode '(("^[ \t]*\\(?:[-+*]\\|[0-9]+[.)]\\)[ \t]+\\(?:\\[@\\(?:start:\\)?[0-9]+\\][ \t]*\\)?\\(\\[[- X]\\]\\)"
-                1 'org-checkbox prepend)))
-  (font-lock-add-keywords
-   'org-mode '(;; ...and replace it with my own
-               ("^[ \t]*\\(?:[-+*]\\|[0-9]+[).]\\)[ \t]+\\(\\(?:\\[@\\(?:start:\\)?[0-9]+\\][ \t]*\\)?\\[\\(?:X\\|\\([0-9]+\\)/\\2\\)\\][^\n]*\n\\)"
-                1 'org-headline-done t)
-               ("^[ \t]*\\(?:[-+*]\\|[0-9]+[.)]\\)[ \t]+\\(?:\\[@\\(?:start:\\)?[0-9]+\\][ \t]*\\)?\\(\\[[- ]\\]\\)"
-                1 'org-checkbox append)
-               ;; Also highlight list bullets
-               ("^ *\\([-+]\\|[0-9]+[).]\\) " 1 'org-list-dt append)
-               ;; and separators
-               ("^ *\\(-----+\\)$" 1 'org-meta-line)))
+  (add-hook! 'org-font-lock-set-keywords-hook
+    (setq org-font-lock-extra-keywords
+          (delete '("\\[\\([0-9]*%\\)\\]\\|\\[\\([0-9]*\\)/\\([0-9]*\\)\\]"
+                    (0 (org-get-checkbox-statistics-face) t))
+                  org-font-lock-extra-keywords))
+    (nconc org-font-lock-extra-keywords
+           '(;; Make checkbox statistic cookies respect underlying faces
+             ("\\[\\([0-9]*%\\)\\]\\|\\[\\([0-9]*\\)/\\([0-9]*\\)\\]"
+              (0 (org-get-checkbox-statistics-face) prepend))
+             ;; I like how org-mode fontifies checked TODOs and want this to extend to
+             ;; checked checkbox items:
+             ("^[ \t]*\\(?:[-+*]\\|[0-9]+[).]\\)[ \t]+\\(\\(?:\\[@\\(?:start:\\)?[0-9]+\\][ \t]*\\)?\\[\\(?:X\\|\\([0-9]+\\)/\\2\\)\\][^\n]*\n\\)"
+              1 'org-headline-done prepend)
+             ;; make plain list bullets stand out
+             ("^ *\\([-+]\\|[0-9]+[).]\\) " 1 'org-list-dt append)
+             ;; and separators/dividers
+             ("^ *\\(-----+\\)$" 1 'org-meta-line)
+             ;; custom #hashtags & @at-tags for another level of organization
+             ;; TODO refactor this into a single rule
+             ("\\s-\\(#[^ \n]+\\)" 1 'org-tag)
+             ("\\s-\\(@[^ \n]+\\)" 1 'org-special-keyword))))
 
   ;; Enable gpg support
   (require 'epa-file)
@@ -219,20 +229,18 @@
     (sp-local-pair "{" nil))
 
   ;; The standard unicode characters are usually misaligned depending on the
-  ;; font. This bugs me. Personally, the markdown #-marks for headlines are more
-  ;; elegant, so use those.
+  ;; font. This bugs me. Personally, markdown #-marks for headlines are more
+  ;; elegant, so we use those.
   (def-package! org-bullets
     :commands org-bullets-mode
-    :init (add-hook 'org-mode-hook 'org-bullets-mode)
+    :init (add-hook 'org-mode-hook #'org-bullets-mode)
     :config (setq org-bullets-bullet-list '("#")))
 
   ;; Keybinds
   (map! (:map org-mode-map
-          "RET" nil
+          "RET" #'org-return-indent
           "C-j" nil
-          "C-k" nil
-          :i [remap doom/inflate-space-maybe] #'org-self-insert-command
-          :i "RET" #'org-return-indent)
+          "C-k" nil)
 
         (:map evil-org-mode-map
           :n  "RET" #'+org/dwim-at-point
@@ -261,10 +269,10 @@
           :i  [backtab]       #'+org/dedent-or-prev-field
 
           :n  "<tab>" #'+org/toggle-fold
+          :v  "<S-tab>" #'+snippets/expand-on-region
 
           :nv "j"   #'evil-next-visual-line
           :nv "k"   #'evil-previous-visual-line
-          :v  "<S-tab>" #'+snippets/expand-on-region
 
           :i  "M-a" (λ! (evil-visual-state) (org-mark-element))
           :n  "M-a" #'org-mark-element

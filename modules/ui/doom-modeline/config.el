@@ -1,5 +1,7 @@
 ;;; ui/doom-modeline/config.el
 
+(eval-when-compile (require 'subr-x))
+
 (line-number-mode -1)
 
 ;; all-the-icons doesn't work in the terminal, so we "disable" it.
@@ -40,16 +42,19 @@
         anzu-minimum-input-length 1
         anzu-search-threshold 250)
 
-  (make-variable-buffer-local 'anzu--state)
+  ;; Avoid anzu conflicts across buffers
+  (mapc #'make-variable-buffer-local
+        '(anzu--total-matched anzu--current-position anzu--state
+          anzu--cached-count anzu--cached-positions anzu--last-command
+          anzu--last-isearch-string anzu--overflow-p))
+
   (defun +doom-modeline|reset-anzu ()
-    (setq anzu--state nil))
+    (anzu--reset-status))
   ;; Ensure anzu state is cleared when searches & iedit are done
-  (add-hook! '(kill-buffer-hook find-file-hook) #'+doom-modeline|reset-anzu)
-  (after! evil
-    (add-hook '+evil-esc-hook #'+doom-modeline|reset-anzu t)
-    (advice-add #'evil-ex-search-abort :after #'+doom-modeline|reset-anzu)
-    (after! evil-multiedit
-      (add-hook 'iedit-mode-end-hook #'+doom-modeline|reset-anzu))))
+  (add-hook! :append '(kill-buffer isearch-mode-end +evil-esc-hook)
+    #'+doom-modeline|reset-anzu)
+  (after! iedit
+    (add-hook 'iedit-mode-end-hook #'+doom-modeline|reset-anzu)))
 
 
 ;;; Flash the mode-line on error
@@ -118,8 +123,8 @@
   "Face used for the dirname part of the buffer path."
   :group '+doom-modeline)
 
-(defface doom-modeline-buffer-project
-  '((t (:inherit doom-modeline-buffer-path :bold nil)))
+(defface doom-modeline-buffer-file
+  '((t (:inherit doom-modeline-buffer-path)))
   "Face used for the filename part of the mode-line buffer path."
   :group '+doom-modeline)
 
@@ -235,29 +240,36 @@ active."
                           data))))
         'xpm t :ascent 'center)))))
 
+(defun +doom-modeline--buffer-file ()
+  "Display the base of the current buffer's filename."
+  (if buffer-file-name
+      (file-name-nondirectory (or buffer-file-truename (file-truename buffer-file-name)))
+    "%b"))
+
 (defun +doom-modeline--buffer-path ()
   "Displays the buffer's full path relative to the project root (includes the
 project root). Excludes the file basename. See `doom-buffer-name' for that."
-  (if buffer-file-name
-      (let* ((default-directory (file-name-directory buffer-file-name))
-             (buffer-path (file-relative-name buffer-file-name (doom-project-root))))
-        (when (and buffer-path (not (equal buffer-path ".")))
-          (let ((max-length (truncate (* (window-body-width) 0.4))))
-            (if (> (length buffer-path) max-length)
-                (let ((path (nreverse (split-string buffer-path "/" t)))
-                      (output ""))
-                  (when (and path (equal "" (car path)))
-                    (setq path (cdr path)))
-                  (while (and path (<= (length output) (- max-length 4)))
-                    (setq output (concat (car path) "/" output))
-                    (setq path (cdr path)))
-                  (when path
-                    (setq output (concat "../" output)))
-                  (when (string-suffix-p "/" output)
-                    (setq output (substring output 0 -1)))
-                  output)
-              buffer-path))))
-    "%b"))
+  (when buffer-file-name
+    (let ((buffer-path
+           (file-relative-name (file-name-directory
+                                (or buffer-file-truename (file-truename buffer-file-name)))
+                               (doom-project-root))))
+      (unless (equal buffer-path "./")
+        (let ((max-length (truncate (* (window-body-width) 0.4))))
+          (if (> (length buffer-path) max-length)
+              (let ((path (nreverse (split-string buffer-path "/" t)))
+                    (output ""))
+                (when (and path (equal "" (car path)))
+                  (setq path (cdr path)))
+                (while (and path (<= (length output) (- max-length 4)))
+                  (setq output (concat (car path) "/" output)
+                        path (cdr path)))
+                (when path
+                  (setq output (concat "../" output)))
+                (unless (string-suffix-p "/" output)
+                  (setq output (concat output "/")))
+                output)
+            buffer-path))))))
 
 
 ;;
@@ -267,7 +279,7 @@ project root). Excludes the file basename. See `doom-buffer-name' for that."
 (def-modeline-segment! buffer-project
   "Displays `doom-project-root'. This is for special buffers like the scratch
 buffer where knowing the current project directory is important."
-  (let ((face (if (active) 'doom-modeline-buffer-project)))
+  (let ((face (if (active) 'doom-modeline-buffer-path)))
     (concat (all-the-icons-octicon
              "file-directory"
              :face face
@@ -280,11 +292,10 @@ buffer where knowing the current project directory is important."
 (def-modeline-segment! buffer-info
   "Combined information about the current buffer, including the current working
 directory, the file name, and its state (modified, read-only or non-existent)."
-  (let ((all-the-icons-scale-factor 1.2)
-        (modified-p (buffer-modified-p))
-        faces)
-    (if (active)   (push 'doom-modeline-buffer-path faces))
-    (if modified-p (push 'doom-modeline-buffer-modified faces))
+  (let* ((all-the-icons-scale-factor 1.2)
+         (modified-p (buffer-modified-p))
+         (active (active))
+         (faces (if modified-p 'doom-modeline-buffer-modified)))
     (concat (if buffer-read-only
                 (concat (all-the-icons-octicon
                          "lock"
@@ -303,8 +314,14 @@ directory, the file name, and its state (modified, read-only or non-existent)."
                        :face 'doom-modeline-urgent
                        :v-adjust -0.05)
                       " "))
-            (propertize (+doom-modeline--buffer-path)
-                        'face (if faces `(:inherit ,faces))))))
+            (when-let (dir-path (+doom-modeline--buffer-path))
+              (if-let (faces (or faces (if active 'doom-modeline-buffer-path)))
+                  (propertize dir-path 'face `(:inherit ,faces))
+                dir-path))
+            (when-let (file-path (+doom-modeline--buffer-file))
+              (if-let (faces (or faces (if active 'doom-modeline-buffer-file)))
+                  (propertize file-path 'face `(:inherit ,faces))
+                file-path)))))
 
 ;;
 (def-modeline-segment! buffer-encoding
@@ -456,10 +473,14 @@ lines are selected, or the NxM dimensions of a block selection."
     (propertize
      (let ((here anzu--current-position)
            (total anzu--total-matched))
-       (pcase anzu--state
-         ('replace-query (format " %d replace " total))
-         ('replace (format " %d/%d " here total))
-         (_ (format " %s/%d%s " here total (if anzu--overflow-p "+" "")))))
+       (cond ((eq anzu--state 'replace-query)
+              (format " %d replace " total))
+             ((eq anzu--state 'replace)
+              (format " %d/%d " here total))
+             (anzu--overflow-p
+              (format " %s+ " total))
+             (t
+              (format " %s/%d " here total))))
      'face (if (active) 'doom-modeline-panel))))
 
 (defsubst +doom-modeline--evil-substitute ()
@@ -517,9 +538,9 @@ with `evil-ex-substitute', and/or 4. The number of active `iedit' regions."
 
 ;;
 (def-modeline-segment! eldoc
-  "Used with `eldoc-eval' to show the eldoc string in the modeline, while using
-`eval-expression'."
-  (and (boundp 'str) str))
+  "Display eldoc documentation in the mode-line while using the minibuffer (e.g.
+`eval-expression')."
+  (bound-and-true-p str))
 
 ;; These bars regulate the height of the mode-line in GUI Emacs.
 (def-modeline-segment! bar
