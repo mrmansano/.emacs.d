@@ -4,7 +4,7 @@
   "The color theme currently in use.")
 
 (defvar +doom-font
-  (font-spec :family "Fira Mono" :size 12)
+  (font-spec :family "Courier Prime Code" :size 12)
   "The font currently in use.")
 
 (defvar +doom-variable-pitch-font
