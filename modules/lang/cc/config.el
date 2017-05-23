@@ -4,7 +4,7 @@
   :commands (c-mode c++-mode objc-mode java-mode)
   :mode ("\\.mm" . objc-mode)
   :init
-  (setq-default c-basic-offset tab-width)
+  (setq-default c-basic-offset 4 tab-width 4 indent-tabs-mode t)
 
   ;; Auto-detect C++ header files
   (push (cons (lambda ()
@@ -63,7 +63,7 @@
   (c-set-offset 'block-open '+)
   (c-set-offset 'brace-list-open '+)   ; all "opens" should be indented by the c-indent-level
   (c-set-offset 'case-label '+)        ; indent case labels by c-indent-level, too
-  (c-set-offset 'access-label '-)
+  (c-set-offset 'access-label '--)
   (c-set-offset 'arglist-intro '+)
   (c-set-offset 'arglist-close '0)
 
