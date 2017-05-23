@@ -84,7 +84,7 @@ modes are active and the buffer is read-only.")
 
 ;; don't kill scratch buffers
 (defun doom|dont-kill-scratch-buffer ()
-  (or (not (eq (buffer-name) "*scratch*"))
+  (or (not (string= (buffer-name) "*scratch*"))
       (ignore (bury-buffer))))
 (add-hook 'kill-buffer-query-functions #'doom|dont-kill-scratch-buffer)
 
@@ -231,9 +231,7 @@ sake."
 (def-package! wgrep
   :commands (wgrep-setup wgrep-change-to-wgrep-mode)
   :config
-  (setq wgrep-auto-save-buffer t)
-  (advice-add #'wgrep-abort-changes :after #'doom/popup-close)
-  (advice-add #'wgrep-finish-edit :after #'doom/popup-close))
+  (setq wgrep-auto-save-buffer t))
 
 (provide 'core-editor)
 ;;; core-editor.el ends here

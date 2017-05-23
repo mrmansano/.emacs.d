@@ -70,7 +70,8 @@
   (defun +org|realign-table-maybe ()
     "Auto-align table under cursor."
     (when (org-at-table-p)
-      (org-table-align)))
+      (save-excursion
+        (org-table-align))))
   (add-hook 'evil-insert-state-exit-hook #'+org|realign-table-maybe nil t)
 
   (defun +org|update-cookies ()
@@ -189,32 +190,52 @@
                       ext-regexp "\\)\\(\\]\\]\\|>\\|'\\)?") . 2)
             (,(concat "<\\(http://.+\\." ext-regexp "\\)>") . 1))))
 
-  ;;; Custom fontification
-  (add-hook! 'org-font-lock-set-keywords-hook
-    (setq org-font-lock-extra-keywords
-          (delete '("\\[\\([0-9]*%\\)\\]\\|\\[\\([0-9]*\\)/\\([0-9]*\\)\\]"
-                    (0 (org-get-checkbox-statistics-face) t))
-                  org-font-lock-extra-keywords))
-    (nconc org-font-lock-extra-keywords
-           '(;; Make checkbox statistic cookies respect underlying faces
-             ("\\[\\([0-9]*%\\)\\]\\|\\[\\([0-9]*\\)/\\([0-9]*\\)\\]"
-              (0 (org-get-checkbox-statistics-face) prepend))
-             ;; I like how org-mode fontifies checked TODOs and want this to extend to
-             ;; checked checkbox items:
-             ("^[ \t]*\\(?:[-+*]\\|[0-9]+[).]\\)[ \t]+\\(\\(?:\\[@\\(?:start:\\)?[0-9]+\\][ \t]*\\)?\\[\\(?:X\\|\\([0-9]+\\)/\\2\\)\\][^\n]*\n\\)"
-              1 'org-headline-done prepend)
-             ;; make plain list bullets stand out
-             ("^ *\\([-+]\\|[0-9]+[).]\\) " 1 'org-list-dt append)
-             ;; and separators/dividers
-             ("^ *\\(-----+\\)$" 1 'org-meta-line)
-             ;; custom #hashtags & @at-tags for another level of organization
-             ;; TODO refactor this into a single rule
-             ("\\s-\\(#[^ \n]+\\)" 1 'org-tag)
-             ("\\s-\\(@[^ \n]+\\)" 1 'org-special-keyword))))
 
-  ;; Enable gpg support
-  (require 'epa-file)
-  (epa-file-enable)
+
+  ;;; Custom fontification
+  (defun +org--tag-face (n)
+    (let ((kwd (match-string n)))
+      (or (and (equal kwd "#") 'org-tag)
+          (and (equal kwd "@") 'org-special-keyword))))
+
+  (defun +org|adjust-faces ()
+    "Correct (and improve) org-mode's font-lock keywords.
+
+  1. Re-set `org-todo' & `org-headline-done' faces, to make them respect
+     underlying faces.
+  2. Fontify item bullets
+  3. Fontify item checkboxes (and when they're marked done)"
+    (let ((org-todo (format org-heading-keyword-regexp-format
+                            org-todo-regexp))
+          (org-done (format org-heading-keyword-regexp-format
+                            (concat "\\(?:" (mapconcat #'regexp-quote org-done-keywords "\\|") "\\)"))))
+      (setq
+       org-font-lock-extra-keywords
+       (append (org-delete-all
+                `(("\\[\\([0-9]*%\\)\\]\\|\\[\\([0-9]*\\)/\\([0-9]*\\)\\]"
+                   (0 (org-get-checkbox-statistics-face) t))
+                  (,org-todo (2 (org-get-todo-face 2) t))
+                  (,org-done (2 'org-headline-done t)))
+                org-font-lock-extra-keywords)
+               `((,org-todo (2 (org-get-todo-face 2) prepend))
+                 (,org-done (2 'org-headline-done prepend))
+                 ;; Make checkbox statistic cookies respect underlying faces
+                 ("\\[\\([0-9]*%\\)\\]\\|\\[\\([0-9]*\\)/\\([0-9]*\\)\\]"
+                  (0 (org-get-checkbox-statistics-face) prepend))
+                 ;; I like how org-mode fontifies checked TODOs and want this to extend to
+                 ;; checked checkbox items:
+                 ("^[ \t]*\\(?:[-+*]\\|[0-9]+[).]\\)[ \t]+\\(\\(?:\\[@\\(?:start:\\)?[0-9]+\\][ \t]*\\)?\\[\\(?:X\\|\\([0-9]+\\)/\\2\\)\\][^\n]*\n\\)"
+                  1 'org-headline-done prepend)
+                 ;; make plain list bullets stand out
+                 ("^ *\\([-+]\\|[0-9]+[).]\\) " 1 'org-list-dt append)
+                 ;; and separators/dividers
+                 ("^ *\\(-----+\\)$" 1 'org-meta-line)
+                 ;; custom #hashtags & @at-tags for another level of organization
+                 ;; TODO refactor this into a single rule
+                 ("\\s-\\(\\([#@]\\)[^ \n]+\\)" 1 (+org--tag-face 2)))))))
+  (add-hook 'org-font-lock-set-keywords-hook #'+org|adjust-faces)
+
+  ;; enable gpg support
   (require 'org-crypt)
   (org-crypt-use-before-save-magic)
   (setq org-tags-exclude-from-inheritance '("crypt")
@@ -263,13 +284,11 @@
           :i  "C-e" #'org-end-of-line
           :i  "C-a" #'org-beginning-of-line
 
-          :i  "<tab>"         #'+org/indent-or-next-field-or-yas-expand
-          :i  [S-iso-lefttab] #'+org/dedent-or-prev-field ; for GNU Emacs
-          :i  [(shift tab)]   #'+org/dedent-or-prev-field
+          :i  [tab]           #'+org/indent-or-next-field-or-yas-expand
           :i  [backtab]       #'+org/dedent-or-prev-field
 
-          :n  "<tab>" #'+org/toggle-fold
-          :v  "<S-tab>" #'+snippets/expand-on-region
+          :n  [tab]     #'+org/toggle-fold
+          :v  [backtab] #'+snippets/expand-on-region
 
           :nv "j"   #'evil-next-visual-line
           :nv "k"   #'evil-previous-visual-line
@@ -278,43 +297,32 @@
           :n  "M-a" #'org-mark-element
           :v  "M-a" #'mark-whole-buffer
 
-          :ni "<M-return>"   (λ! (+org/insert-item 'below))
-          :ni "<S-M-return>" (λ! (+org/insert-item 'above))
-
-          ;; Formatting shortcuts
-          :i  "M-b" (λ! (+org-surround "*")) ; bold
-          :i  "M-u" (λ! (+org-surround "_")) ; underline
-          :i  "M-i" (λ! (+org-surround "/")) ; italics
-          :i  "M-`" (λ! (+org-surround "+")) ; strikethrough
-
-          :v  "M-b" "S*"
-          :v  "M-u" "S_"
-          :v  "M-i" "S/"
-          :v  "M-`" "S+"
+          :ni [M-return]   (λ! (+org/insert-item 'below))
+          :ni [S-M-return] (λ! (+org/insert-item 'above))
 
           (:localleader
            :n  "RET" #'org-archive-subtree
            :n  "SPC" #'+org/toggle-checkbox
-           :n  "/"  #'org-sparse-tree
-           :n  "="  #'org-align-all-tags
-           :n  "?"  #'org-tags-view
-           :n  "a"  #'org-agenda
-           :n  "d"  #'org-time-stamp
-           :n  "D"  #'org-deadline
-           :n  "e"  #'org-edit-special
-           :n  "E"  #'+org/edit-special-same-window
-           :n  "n"  (λ! (if (buffer-narrowed-p) (widen) (org-narrow-to-subtree)))
-           :n  "r"  #'org-refile
-           :n  "R"  (λ! (org-metaleft) (org-archive-to-archive-sibling)) ; archive to parent sibling
-           :n  "s"  #'org-schedule
-           :n  "t"  (λ! (org-todo (if (org-entry-is-todo-p) 'none 'todo)))
-           :v  "t"  (λ! (evil-ex-normal evil-visual-beginning evil-visual-end "\\t"))
-           :n  "T"  #'org-todo
-           :n  "v"  #'variable-pitch-mode
-           :nv "l"  #'org-insert-link
-           :nv "L"  #'org-store-link
-           ;; :n  "w"  'writing-mode
-           ;; :n  "x"  '+org/remove-link
+           :n  "/"   #'org-sparse-tree
+           :n  "="   #'org-align-all-tags
+           :n  "?"   #'org-tags-view
+           :n  "a"   #'org-agenda
+           :n  "d"   #'org-time-stamp
+           :n  "D"   #'org-deadline
+           :n  "e"   #'org-edit-special
+           :n  "E"   #'+org/edit-special-same-window
+           :n  "n"   (λ! (if (buffer-narrowed-p) (widen) (org-narrow-to-subtree)))
+           :n  "r"   #'org-refile
+           :n  "R"   (λ! (org-metaleft) (org-archive-to-archive-sibling)) ; archive to parent sibling
+           :n  "s"   #'org-schedule
+           :n  "t"   (λ! (org-todo (if (org-entry-is-todo-p) 'none 'todo)))
+           :v  "t"   (λ! (evil-ex-normal evil-visual-beginning evil-visual-end "\\t"))
+           :n  "T"   #'org-todo
+           :n  "v"   #'variable-pitch-mode
+           :nv "l"   #'org-insert-link
+           :nv "L"   #'org-store-link
+          ;:n  "w"   #'writing-mode
+          ;:n  "x"   #'+org/remove-link
            )
 
           ;; TODO Improve folding bindings
@@ -372,7 +380,7 @@
 
   ;; Remove highlights on ESC
   (defun +org|remove-occur-highlights (&rest args)
-    (when (eq major-mode 'org-mode)
+    (when (derived-mode-p 'org-mode)
       (org-remove-occur-highlights)))
   (add-hook '+evil-esc-hook #'+org|remove-occur-highlights)
 

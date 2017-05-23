@@ -35,9 +35,6 @@
         evil-ex-visual-char-range t  ; column range for ex commands
         evil-insert-skip-empty-lines t
         evil-mode-line-format 'nil
-        ;; Move to new split
-        evil-split-window-below t
-        evil-vsplit-window-right t
         ;; more vim-like behavior
         evil-symbol-word-search t
         ;; don't activate mark on shift-click
@@ -87,7 +84,12 @@
   ;; --- keybind fixes ----------------------
   (map! ;; undo/redo for visual regions
         :v "C-u" #'undo-tree-undo
-        :v "C-r" #'undo-tree-redo)
+        :v "C-r" #'undo-tree-redo
+
+        (:after wgrep
+          ;; a wrapper that invokes `wgrep-mark-deletion' across lines
+          ;; you use `evil-delete' on.
+          :map wgrep-mode-map [remap evil-delete] #'+evil-delete))
 
 
   ;; --- evil hacks -------------------------
@@ -131,7 +133,11 @@ across windows."
   (advice-add #'evil-ex-replace-special-filenames
               :override #'+evil*ex-replace-special-filenames)
 
-  ;; Add extra argument types that highlight matches in the current buffer.
+  ;; By default :g[lobal] doesn't highlight matches in the current buffer. I've
+  ;; got to write my own argument type and interactive code to get it to do so.
+  ;; While I'm at it, I use this to write an :al[ign] command as a wrapper
+  ;; around `align-regexp'.
+
   ;; TODO Must be simpler way to do this
   (evil-ex-define-argument-type buffer-match :runner +evil-ex-buffer-match)
   (evil-ex-define-argument-type global-match :runner +evil-ex-global-match)
@@ -158,8 +164,19 @@ across windows."
                (evil-transform-vim-style-regexp pattern)))
      1 1))
 
+  ;; Must be aggressively defined here, otherwise the above highlighting won't
+  ;; work on first invocation
   (evil-ex-define-cmd "g[lobal]" #'+evil:global)
-  (evil-ex-define-cmd "al[ign]"  #'+evil:align))
+  (evil-ex-define-cmd "al[ign]"  #'+evil:align)
+
+  ;; Move to new split -- setting `evil-split-window-below' &
+  ;; `evil-vsplit-window-right' to non-nil mimics this, but that doesn't update
+  ;; window history. That means when you delete a new split, Emacs leaves you on
+  ;; the 2nd to last window on the history stack, which is jarring.
+  (defun +evil*window-follow (&rest _)  (evil-window-down 1))
+  (defun +evil*window-vfollow (&rest _) (evil-window-right 1))
+  (advice-add #'evil-window-split  :after #'+evil*window-follow)
+  (advice-add #'evil-window-vsplit :after #'+evil*window-vfollow))
 
 
 ;;
@@ -261,7 +278,8 @@ across windows."
 (def-package! evil-escape
   :demand t
   :init
-  (setq evil-escape-excluded-states '(visual multiedit)
+  (setq evil-escape-excluded-states '(normal visual multiedit)
+        evil-escape-excluded-major-modes '(neotree-mode)
         evil-escape-key-sequence "jk"
         evil-escape-delay 0.25)
 
@@ -351,7 +369,6 @@ the new algorithm is confusing, like in python or ruby."
 
 
 (def-package! evil-textobj-anyblock
-  :commands (evil-numbers/inc-at-pt evil-numbers/dec-at-pt)
   :init
   (+evil--textobj "B"
     #'evil-textobj-anyblock-inner-block
@@ -385,11 +402,31 @@ the new algorithm is confusing, like in python or ruby."
   :config (global-evil-surround-mode 1))
 
 
-(def-package! evil-vimish-fold
-  :commands evil-vimish-fold-mode
+(def-package! evil-vimish-fold :demand t
   :init
   (setq vimish-fold-dir (concat doom-cache-dir "vimish-fold/")
-        vimish-fold-indication-mode 'right-fringe))
+        vimish-fold-indication-mode 'right-fringe)
+
+  :config
+  (evil-vimish-fold-mode +1)
+
+  ;; custom folding system
+  (defun +evil*fold-hs-minor-mode (&rest args)
+    "Lazily activate buffer-local hs-minor-mode."
+    (unless (bound-and-true-p hs-minor-mode)
+      (hs-minor-mode +1)))
+  (advice-add #'evil-fold-action :before #'+evil*fold-hs-minor-mode)
+
+  (add-to-list
+   'evil-fold-list
+   '((evil-vimish-fold-mode hs-minor-mode)
+     :delete vimish-fold-delete
+     :open-all +evil/fold-open-all
+     :close-all +evil/fold-close-all
+     :toggle +evil/fold-toggle
+     :open +evil/fold-open
+     :open-rec nil
+     :close +evil/fold-close)))
 
 
 ;; Without `evil-visualstar', * and # grab the word at point and search, no

@@ -46,7 +46,7 @@ is enabled/disabled.'")
 (def-package! shackle :demand t
   :init
   (setq shackle-default-alignment 'below
-        shackle-default-size 10
+        shackle-default-size 8
         ;;; Baseline popup-window rules
         ;; Several custom properties have been added that are not part of
         ;; shackle and are used by doom's popup system. They are:
@@ -63,24 +63,25 @@ is enabled/disabled.'")
         ;;  :autoclose  If non-nil, close popup if ESC is pressed from outside
         ;;              the popup window.
         shackle-rules
-        '(("^\\*ftp " :size 8  :noselect t :autokill t :noesc t)
+        '(("^\\*ftp " :noselect t :autokill t :noesc t)
           ;; doom
-          ("^\\*doom:" :regexp t :size 0.35 :noesc t :select t)
+          ("^\\*doom:" :regexp t :size 0.35 :noesc t :select t :modeline t)
           ("^\\*doom " :regexp t :noselect t :autokill t :autoclose t)
           ;; built-in (emacs)
-          (Buffer-menu-mode :size 20 :autokill t)
-          (apropos-mode :size 0.3 :autokill t :autoclose t)
-          (comint-mode :noesc t)
-          (grep-mode :size 25 :noselect t :autokill t)
-          (special-mode :size 12 :noselect t :autokill t)
-          (tabulated-list-mode :noesc t)
-          (profiler-report-mode :size 0.3 :regexp t :autokill t)
           ("*Backtrace*" :size 20 :noselect t)
-          ("*Warnings*" :noselect t :autokill t)
+          ("*Warnings*" :size 5 :noselect t :autokill t :autoclose t)
+          ("*Messages*" :size 12 :noselect t :autokill nil)
           ("*Help*" :size 0.3)
           ("^\\*.*Shell Command.*\\*$" :regexp t :size 20 :noselect t :autokill t)
-          ("^\\*"  :regexp t :noselect t)
-          ("^ \\*" :regexp t :size 12 :noselect t :autokill t :autoclose t)))
+          ("^\\*"  :regexp t :noselect t :autokill t)
+          ("^ \\*" :regexp t :size 12 :noselect t :autokill t :autoclose t)
+          (apropos-mode :size 0.3 :autokill t :autoclose t)
+          (Buffer-menu-mode :size 20 :autokill t)
+          (comint-mode :noesc t)
+          (grep-mode :size 25 :noselect t :autokill t)
+          (profiler-report-mode :size 0.3 :regexp t :autokill t :modeline minimal)
+          (tabulated-list-mode :noesc t)
+          (special-mode :noselect t :autokill t :autoclose t)))
 
   :config
   (if (display-graphic-p)
@@ -256,15 +257,14 @@ properties."
 
 
 (after! eshell
-  ;; When eshell runs a visual command (see `eshell-visual-commands'), it spawns
-  ;; a term buffer to run it in, but where it spawns it is the problem.
-
   ;; By tying buffer life to its process, we ensure that we land back in the
   ;; eshell buffer after term dies. May cause problems with short-lived
   ;; processes.
   ;; FIXME replace with a 'kill buffer' keybinding.
   (setq eshell-destroy-buffer-when-process-dies t)
 
+  ;; When eshell runs a visual command (see `eshell-visual-commands'), it spawns
+  ;; a term buffer to run it in, but where it spawns it is the problem...
   (defun doom*eshell-undedicate-popup (orig-fn &rest args)
     "Force spawned term buffer to share with the eshell popup (if necessary)."
     (when (doom-popup-p)
@@ -277,15 +277,21 @@ properties."
 
 (after! evil
   (let ((map doom-popup-mode-map))
-    (define-key map [remap evil-window-delete]           'doom/popup-close)
-    (define-key map [remap evil-save-modified-and-close] 'doom/popup-close)
-    (define-key map [remap evil-window-move-very-bottom] 'ignore)
-    (define-key map [remap evil-window-move-very-top]    'ignore)
-    (define-key map [remap evil-window-move-far-left]    'ignore)
-    (define-key map [remap evil-window-move-far-right]   'ignore)
-    (define-key map [remap evil-window-split]            'ignore)
-    (define-key map [remap evil-window-vsplit]           'ignore)
-    (define-key map [remap evil-force-normal-state]      'doom/popup-close-maybe))
+    (define-key map [remap evil-window-delete]           #'doom/popup-close)
+    (define-key map [remap evil-save-modified-and-close] #'doom/popup-close)
+    (define-key map [remap evil-window-move-very-bottom] #'ignore)
+    (define-key map [remap evil-window-move-very-top]    #'ignore)
+    (define-key map [remap evil-window-move-far-left]    #'ignore)
+    (define-key map [remap evil-window-move-far-right]   #'ignore)
+    (define-key map [remap evil-window-split]            #'ignore)
+    (define-key map [remap evil-window-vsplit]           #'ignore))
+
+  (defun doom|popup-close-maybe ()
+    "Close the current window if it's a popup with no :noesc property."
+    (when (and (doom-popup-p)
+               (not (doom-popup-prop :noesc)))
+      (delete-window)))
+  (add-hook '+evil-esc-hook #'doom|popup-close-maybe)
 
   (defun doom|popup-close-all-maybe ()
     "Close popups with an :autoclose property when pressing ESC from normal
@@ -389,6 +395,39 @@ the command buffer."
       (doom--switch-from-popup (find-function-search-for-symbol fun 'defface file)))))
 
 
+(after! magit
+  (set! :popup "^\\*magit" :regexp t :size 0.5 :noesc t :autokill t)
+
+  ;; magit doesn't need much coercing. It works with shackle as is, except for
+  ;; one problem: following non-file magit links tends to open additional
+  ;; popups. We want all this to be contained within one window, so...
+  (defun doom-magit-popup-buffer (buffer)
+    "Pop up the magit window with shackle."
+    (cond ((doom-popup-p)
+           (prog1 (doom-popup-switch-to-buffer buffer)
+             (doom-hide-modeline-mode +1)))
+          (t
+           (magit-display-buffer-traditional buffer))))
+
+  (defun doom-magit-quit-window (kill-buffer)
+    "Close the current magit window properly."
+    (let ((last (current-buffer)))
+      (cond ((when-let (dest (doom-buffers-in-mode
+                              'magit-mode
+                              (cl-remove-if (lambda (buf) (eq buf last))
+                                            (mapcar #'car (window-prev-buffers)))
+                              t))
+               (doom-popup-switch-to-buffer (car dest)))
+             (kill-buffer last))
+            (t
+             (mapc #'kill-buffer
+                   (doom-buffers-in-mode '(magit-mode magit-process-mode)
+                                         (buffer-list) t))))))
+
+  (setq magit-display-buffer-function #'doom-magit-popup-buffer
+        magit-bury-buffer-function #'doom-magit-quit-window))
+
+
 (after! mu4e
   (defun doom*mu4e-popup-window (buf height)
     (doom-popup-buffer buf :size 10 :noselect t)
@@ -407,11 +446,21 @@ the command buffer."
   ;;
   ;; By handing neotree over to shackle, which is better integrated into the
   ;; rest of my config (and persp-mode), this is no longer a problem.
-  (setq neo-display-action '(+evil-neotree-display-fn))
   (set! :popup " *NeoTree*" :align 'left :size 25)
 
   (defun +evil-neotree-display-fn (buf _alist)
-    (doom-popup-buffer buf)))
+    "Hand neotree off to shackle."
+    (let ((win (doom-popup-buffer buf)))
+      (setq neo-global--buffer (window-buffer win)
+            neo-global--window win)))
+  (setq neo-display-action '(+evil-neotree-display-fn))
+
+  (defun +evil|neotree-fix-popup ()
+    "Repair neotree state whenever its popup state is restored. This ensures
+that `doom*popup-save' won't break it."
+    (when (equal (buffer-name) neo-buffer-name)
+      (setq neo-global--window (selected-window))))
+  (add-hook 'doom-popup-mode-hook #'+evil|neotree-fix-popup))
 
 
 (after! quickrun
@@ -421,6 +470,12 @@ the command buffer."
 
 (after! twittering-mode
   (setq twittering-pop-to-buffer-function #'pop-to-buffer))
+
+
+(after! wgrep
+  ;; close the popup after you're done with a wgrep buffer
+  (advice-add #'wgrep-abort-changes :after #'doom/popup-close)
+  (advice-add #'wgrep-finish-edit   :after #'doom/popup-close))
 
 
 (after! xref
@@ -436,7 +491,7 @@ you came from."
 
 
 ;; Ensure these settings are attached to org-load-hook as late as possible,
-;; giving other modules to add their own hooks.
+;; giving other modules a chance to add their own hooks.
 (add-hook! 'after-init-hook
   (add-hook! 'org-load-hook
     (set! :popup
@@ -455,11 +510,8 @@ you came from."
       '("^CAPTURE.*\\.org$"  :regexp t :size 20))
 
     ;; Org has its own window management system with a scorched earth philosophy
-    ;; I'm not fond of. i.e. it kills all windows and greedily monopolizes the
-    ;; frame. No thanks. We can do better with shackle's help.
-
-    ;; Save the emacsverse from armageddon by suppressing `delete-other-windows'
-    ;; in org functions.
+    ;; I'm not fond of. i.e. it kills all windows and monopolizes the frame. No
+    ;; thanks. We can do better with shackle's help.
     (defun doom*suppress-delete-other-windows (orig-fn &rest args)
       (cl-letf (((symbol-function 'delete-other-windows)
                  (symbol-function 'ignore)))

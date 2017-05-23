@@ -34,7 +34,7 @@
 ;; anzu and evil-anzu make it possible to display current/total in the
 ;; mode-line.
 (def-package! evil-anzu
-  :when (featurep! :feature evil)
+  :when (featurep 'evil)
   :init
   (add-transient-hook! evil-ex-start-search (require 'evil-anzu))
   :config
@@ -119,62 +119,62 @@
   :group 'doom)
 
 (defface doom-modeline-buffer-path
-  '((t (:inherit mode-line :bold t)))
+  '((t (:inherit mode-line-emphasis :bold t)))
   "Face used for the dirname part of the buffer path."
   :group '+doom-modeline)
 
 (defface doom-modeline-buffer-file
-  '((t (:inherit doom-modeline-buffer-path)))
+  '((t (:inherit mode-line-buffer-id)))
   "Face used for the filename part of the mode-line buffer path."
   :group '+doom-modeline)
 
 (defface doom-modeline-buffer-modified
-  '((t (:inherit highlight :background nil)))
+  '((t (:inherit error :background nil :bold t)))
   "Face used for the 'unsaved' symbol in the mode-line."
   :group '+doom-modeline)
 
 (defface doom-modeline-buffer-major-mode
-  '((t (:inherit mode-line :bold t)))
+  '((t (:inherit mode-line-emphasis :bold t)))
   "Face used for the major-mode segment in the mode-line."
   :group '+doom-modeline)
 
 (defface doom-modeline-highlight
-  '((t (:inherit mode-line)))
+  '((t (:inherit mode-line-emphasis)))
   "Face for bright segments of the mode-line."
   :group '+doom-modeline)
 
 (defface doom-modeline-panel
-  '((t (:inherit mode-line)))
+  '((t (:inherit mode-line-highlight)))
   "Face for 'X out of Y' segments, such as `+doom-modeline--anzu', `+doom-modeline--evil-substitute' and
 `iedit'"
   :group '+doom-modeline)
 
 (defface doom-modeline-info
-  `((t (:inherit success)))
+  `((t (:inherit success :bold t)))
   "Face for info-level messages in the modeline. Used by `*vc'."
   :group '+doom-modeline)
 
 (defface doom-modeline-warning
-  `((t (:inherit warning)))
+  `((t (:inherit warning :bold t)))
   "Face for warnings in the modeline. Used by `*flycheck'"
   :group '+doom-modeline)
 
 (defface doom-modeline-urgent
-  `((t (:inherit error)))
+  `((t (:inherit error :bold t)))
   "Face for errors in the modeline. Used by `*flycheck'"
   :group '+doom-modeline)
 
 ;; Bar
-(defface doom-modeline-bar '((t (:inherit highlight :foreground nil)))
+(defface doom-modeline-bar '((t (:inherit highlight)))
   "The face used for the left-most bar on the mode-line of an active window."
   :group '+doom-modeline)
 
-(defface doom-modeline-eldoc-bar '((t (:inherit shadow :foreground nil)))
+(defface doom-modeline-eldoc-bar '((t (:inherit shadow)))
   "The face used for the left-most bar on the mode-line when eldoc-eval is
 active."
   :group '+doom-modeline)
 
-(defface doom-modeline-inactive-bar '((t (:inherit mode-line-inactive)))
+(defface doom-modeline-inactive-bar '((t (:inherit warning :inverse-video t)))
   "The face used for the left-most bar on the mode-line of an inactive window."
   :group '+doom-modeline)
 
@@ -378,7 +378,7 @@ directory, the file name, and its state (modified, read-only or non-existent)."
                      (if active (setq face 'doom-modeline-urgent))
                      (all-the-icons-octicon "alert" :face face))
                     (t
-                     (if active (setq face 'mode-line))
+                     (if active (setq face 'font-lock-doc-face))
                      (all-the-icons-octicon
                       "git-branch"
                       :face face
@@ -399,8 +399,7 @@ directory, the file name, and its state (modified, read-only or non-existent)."
    (when icon
      (concat
       (all-the-icons-octicon icon :face face :height 1.0 :v-adjust 0)
-      (when text
-        (propertize "  " 'face 'variable-pitch))))
+      (if text " ")))
    (when text
      (propertize text 'face face))))
 
@@ -412,7 +411,8 @@ icons."
       ('finished (if flycheck-current-errors
                      (let-alist (flycheck-count-errors flycheck-current-errors)
                        (let ((sum (+ (or .error 0) (or .warning 0))))
-                         (+doom-ml-icon "circle-slash" (format "%s issue%s" sum (if (eq 1 sum) "" "s"))
+                         (+doom-ml-icon "circle-slash"
+                                        (number-to-string sum)
                                         (if .error 'doom-modeline-urgent 'doom-modeline-warning))))
                    (concat
                     (+doom-ml-icon "check" nil 'doom-modeline-info) " ")))
@@ -547,14 +547,15 @@ with `evil-ex-substitute', and/or 4. The number of active `iedit' regions."
   (+doom-modeline--make-xpm
    (face-background (if (active)
                         'doom-modeline-bar
-                      'doom-modeline-inactive-bar))
+                      'doom-modeline-inactive-bar)
+                    nil t)
    +doom-modeline-height
    +doom-modeline-bar-width))
 
 (def-modeline-segment! eldoc-bar
   "A differently colored bar, to signify an eldoc display."
   (+doom-modeline--make-xpm
-   (face-background 'doom-modeline-eldoc-bar)
+   (face-background 'doom-modeline-eldoc-bar nil t)
    +doom-modeline-height
    +doom-modeline-bar-width))
 
@@ -583,6 +584,10 @@ with `evil-ex-substitute', and/or 4. The number of active `iedit' regions."
   (bar " " buffer-project)
   (major-mode))
 
+(def-modeline! media
+  (bar " %b  ")
+  (media-info major-mode))
+
 ;;
 (doom-set-modeline 'main t)
 
@@ -599,4 +604,8 @@ with `evil-ex-substitute', and/or 4. The number of active `iedit' regions."
 (defun +doom-modeline|set-special-modeline ()
   (doom-set-modeline 'special))
 
+(defun +doom-modeline|set-media-modeline ()
+  (doom-set-modeline 'media))
+
 (add-hook 'org-src-mode-hook #'+doom-modeline|set-special-modeline)
+(add-hook 'image-mode-hook #'+doom-modeline|set-media-modeline)

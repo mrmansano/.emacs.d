@@ -70,7 +70,8 @@ there are problems.")
 
 ;;;
 ;; UTF-8 as the default coding system
-(set-charset-priority 'unicode)        ; pretty
+(when (fboundp 'set-charset-priority)
+  (set-charset-priority 'unicode))     ; pretty
 (prefer-coding-system        'utf-8)   ; pretty
 (set-terminal-coding-system  'utf-8)   ; pretty
 (set-keyboard-coding-system  'utf-8)   ; pretty
@@ -153,6 +154,7 @@ enable multiple minor modes for the same regexp.")
       gc-cons-percentage 0.6)
 
 (let (file-name-handler-list)
+  (require 'cl-lib)
   (eval-and-compile
     (require 'core-packages (concat doom-core-dir "core-packages")))
   (eval-when-compile
@@ -173,7 +175,7 @@ enable multiple minor modes for the same regexp.")
     (require 'core-projects)    ; making Emacs project-aware
     (require 'core-keybinds)))  ; centralized keybind system + which-key
 
-(add-hook! 'window-setup-hook
+(add-hook! '(after-init-hook doom-reload-hook)
   (setq gc-cons-threshold 16777216
         gc-cons-percentage 0.1))
 

@@ -5,29 +5,33 @@
       x-alt-keysym   'meta)
 
 (defmacro find-file-in! (path &optional project-p)
-  "Returns an interactive function for searching files"
+  "Returns an interactive function for searching files."
   `(lambda () (interactive)
      (let ((default-directory ,path))
        (call-interactively
         ',(command-remapping
-           (if project-p 'projectile-find-file) 'find-file)))))
+           (if project-p
+               #'projectile-find-file
+             #'find-file))))))
 
 (map!
  [remap evil-jump-to-tag] #'projectile-find-tag
  [remap find-tag]         #'projectile-find-tag)
 
 (map!
- ;; Essential
- "M-x"    #'execute-extended-command
- "A-x"    #'execute-extended-command
+ ;; Make M-x available everywhere
+ :nvime "M-x" #'execute-extended-command
+ :nvime "A-x" #'execute-extended-command
+ :nvime "M-:" #'+hlissner/C-u-M-x
+ :nvime "A-:" #'+hlissner/C-u-M-x
+ ;; Emacs debug utilities
  "M-;"    #'eval-expression
  "A-;"    #'eval-expression
- ;; Tools
  [f9]     #'doom/what-face
  [f10]    #'doom/blink-cursor
  "C-`"    #'doom/popup-toggle
  ;; Text-scaling
- "M-0"    (λ! (text-scale-set 0))
+ "M-+"    (λ! (text-scale-set 0))
  "M-="    #'text-scale-increase
  "M--"    #'text-scale-decrease
  ;; Simple window navigation/manipulation
@@ -41,70 +45,73 @@
  "C-k"    #'evil-window-up
  "C-h"    #'evil-window-left
  "C-l"    #'evil-window-right
+ "M-1"    (λ! (+workspace/switch-to 0))
+ "M-2"    (λ! (+workspace/switch-to 1))
+ "M-3"    (λ! (+workspace/switch-to 2))
+ "M-4"    (λ! (+workspace/switch-to 3))
+ "M-5"    (λ! (+workspace/switch-to 4))
+ "M-6"    (λ! (+workspace/switch-to 5))
+ "M-7"    (λ! (+workspace/switch-to 6))
+ "M-8"    (λ! (+workspace/switch-to 7))
+ "M-9"    (λ! (+workspace/switch-to 8))
+ "M-0"    #'+workspace/switch-to-last
  ;; Basic escape keys for emacs mode
- :e "C-h" #'evil-window-left
- :e "C-j" #'evil-window-down
- :e "C-k" #'evil-window-up
- :e "C-l" #'evil-window-right
- ;; Switching tabs (workspaces)
- "M-1"  (λ! (+workspace/switch-to 0))
- "M-2"  (λ! (+workspace/switch-to 1))
- "M-3"  (λ! (+workspace/switch-to 2))
- "M-4"  (λ! (+workspace/switch-to 3))
- "M-5"  (λ! (+workspace/switch-to 4))
- "M-6"  (λ! (+workspace/switch-to 5))
- "M-7"  (λ! (+workspace/switch-to 6))
- "M-8"  (λ! (+workspace/switch-to 7))
- "M-9"  (λ! (+workspace/switch-to 8))
- "M-0"  #'+workspace/switch-to-last
+ "C-h"    #'evil-window-left
+ "C-j"    #'evil-window-down
+ "C-k"    #'evil-window-up
+ "C-l"    #'evil-window-right
 
- :n "M-r"   #'+eval/buffer
- :v "M-r"   #'+eval/region
- :v "M-S-r" #'+eval/region-and-replace
- :n "M-b"   #'+eval/build
-
- [M-backspace]  #'doom/backward-kill-to-bol-and-indent
- "M-a"          #'mark-whole-buffer
- "M-c"          #'evil-yank
- "M-q"          #'save-buffers-kill-emacs
- "M-s"          #'save-buffer
- "M-v"          #'clipboard-yank
- "M-f"          #'+ivy:swiper
- "C-M-f"        #'doom/toggle-fullscreen
- :m "A-j"       #'+hlissner:multi-next-line
- :m "A-k"       #'+hlissner:multi-previous-line
+ "M-r"    #'+eval/buffer
+ "M-S-r"  #'+eval/region-and-replace
+ "M-b"    #'+eval/build
+ "M-a"    #'mark-whole-buffer
+ "M-c"    #'evil-yank
+ "M-q"    #'save-buffers-kill-emacs
+ "M-s"    #'save-buffer
+ "M-v"    #'clipboard-yank
+ "M-f"    #'+ivy:swiper
+ "C-M-f"  #'doom/toggle-fullscreen
+ :m "A-j" #'+hlissner:multi-next-line
+ :m "A-k" #'+hlissner:multi-previous-line
 
  ;;; <leader> and <localleader>
  :m ";" 'evil-ex
  (:leader
-   ;; common
-   :desc "Switch project buffer"    :n ","  #'persp-switch-to-buffer
-   :desc "Switch buffer"            :n "<"  #'switch-to-buffer
-   :desc "Browse files"             :n "."  #'find-file
-   :desc "Find file from here"      :n ">"  #'counsel-file-jump
-   :desc "Find file in project"     :n "/"  #'projectile-find-file
-   :desc "Find in file (swiper)"    :n "?"  #'swiper
-   :desc "Imenu"                    :n ";"  #'imenu
-   :desc "Imenu across buffers"     :n ":"  #'imenu-anywhere
-   :desc "Find other file"          :n "a"  #'projectile-find-other-file
-   :desc "Jump to bookmark"         :n "b"  #'bookmark-jump
-   :desc "Delete bookmark"          :n "B"  #'bookmark-delete
-   :desc "List errors"              :n "e"  #'flycheck-list-errors
-   :desc "View Emacs Log"           :n "m"  #'view-echo-area-messages
-   :desc "Recent files"             :n "r"  #'recentf
-   :desc "Recent project files"     :n "R"  #'projectile-recentf
-   :desc "Open file explorer"       :n "n"  #'+evil/neotree
-   :desc "Insert from kill ring"    :n "y"  #'counsel-yank-pop
-   :desc "Switch project"           :n "p"  #'projectile-switch-project
-   :desc "Execute in Emacs mode"    :n "\\" #'evil-execute-in-emacs-state
-   :desc "Switch to Emacs mode"     :n "|"  #'evil-emacs-state
+   ;; Most commonly used
+   :desc "Switch project buffer" :n ","  #'persp-switch-to-buffer
+   :desc "Switch buffer"         :n "<"  #'switch-to-buffer
+   :desc "Browse files"          :n "."  #'find-file
+   :desc "Find file from here"   :n ">"  #'counsel-file-jump
+   :desc "Find file in project"  :n "/"  #'projectile-find-file
+   :desc "Find in file (swiper)" :n "?"  #'swiper
+   :desc "Imenu"                 :n ";"  #'imenu
+   :desc "Imenu across buffers"  :n ":"  #'imenu-anywhere
+   :desc "Find other file"       :n "a"  #'projectile-find-other-file
+   :desc "Jump to bookmark"      :n "b"  #'bookmark-jump
+   :desc "Delete bookmark"       :n "B"  #'bookmark-delete
+   :desc "List errors"           :n "e"  #'flycheck-list-errors
+   :desc "View Emacs Log"        :n "m"  #'doom/popup-toggle-messages
+   :desc "Recent files"          :n "r"  #'recentf
+   :desc "Recent project files"  :n "R"  #'projectile-recentf
+   :desc "Insert from kill ring" :n "y"  #'counsel-yank-pop
+   :desc "Switch project"        :n "p"  #'projectile-switch-project
+   :desc "Open Neotree"          :n "\\" #'+evil/neotree
+
    ;; Since I've remapped C-h...
-   :desc "Help"                     :n "h"  #'help-command
+   :desc "help"                  :n "h"  #'help-command
 
    (:desc "quit"
      :prefix "q"
      :desc "Quit"                   :n "q" #'evil-save-and-quit
      :desc "Quit (forget session)"  :n "Q" #'+workspace/kill-session-and-quit)
+
+   (:desc "git"
+     :prefix "g"
+     :desc "Git status"        :n "s" #'magit-status
+     :desc "Git blame"         :n "b" #'magit-blame
+     :desc "Git time machine"  :n "t" #'git-timemachine-toggle
+     :desc "Git revert hunk"   :n "r" #'git-gutter:revert-hunk
+     :desc "List gists"        :n "g" #'+gist:list)
 
    (:desc "session"
      :prefix "s"
@@ -126,8 +133,7 @@
      :desc "Indent guides"          :n "i" #'highlight-indentation-mode
      :desc "Indent guides (column)" :n "I" #'highlight-indentation-current-column-mode
      :desc "Impatient mode"         :n "h" #'+present/impatient-mode
-     :desc "Big mode"               :n "b" #'+present/big-mode
-     :desc "Git time machine"       :n "t" #'git-timemachine-toggle)
+     :desc "Big mode"               :n "b" #'+present/big-mode)
 
    (:desc "remote"
      :prefix "u"
@@ -136,23 +142,24 @@
      :desc "Download remote"        :n "d" #'+upload/remote-download
      :desc "Diff local & remote"    :n "D" #'+upload/diff
      :desc "Browse remote files"    :n "." #'+upload/browse
-     :desc "Detect remote changes"  :n "." #'+upload/check-remote)
+     :desc "Detect remote changes"  :n ">" #'+upload/check-remote)
 
    (:desc "open"
      :prefix "o"
      :desc "Default browser"         :n  "o" #'browse-url-of-file
      :desc "Debugger"                :n  "d" #'+debug/open
+     :desc "Sudo find file"          :n  "s" #'doom/sudo-this-file
+     :desc "Sudo edit"               :n  "S" #'doom/sudo-find-file
      :desc "Build tasks"             :n  "b" #'+eval/build
-     :desc "REPL"                    :n  "r" #'+eval:repl
-     :desc "Send to REPL"            :v  "r" #'+eval:repl
-     :desc "Sudo"                    :n  "s" #'doom/sudo-this-file
+     :desc "Open/Send to REPL"       :nv "r" #'+eval:repl
      :desc "Terminal"                :n  "t" #'+term/popup
      :desc "Terminal @ project root" :n  "T" #'+term/popup-in-project
 
      ;; applications
-     :desc "APP: elfeed"            :n "r"   #'=rss
-     :desc "APP: email"             :n "e"   #'=email
-     :desc "APP: twitter"           :n "t"   #'=twitter
+     :desc "APP: elfeed"            :n "E"   #'=rss
+     :desc "APP: email"             :n "M"   #'=email
+     :desc "APP: twitter"           :n "T"   #'=twitter
+     :desc "APP: regex"             :n "X"   #'=regex
 
      ;; macos
      (:when IS-MAC
@@ -190,8 +197,8 @@
   (:desc "Unit tests"  :prefix "t"))
 
  ;;; Evil-esque bindings
- :n  "zx" #'doom/kill-this-buffer
  ;; Buffers
+ :n  "zx" #'doom/kill-this-buffer
  :n  "ZX" #'bury-buffer
  :n  "]b" #'doom/next-buffer
  :n  "[b" #'doom/previous-buffer
@@ -250,7 +257,7 @@
    "u"       #'winner-undo
    "C-u"     #'winner-undo
    "C-r"     #'winner-redo
-   "o"       #'doom/window-zoom
+   "o"       #'doom/window-enlargen
    ;; Delete window
    "c"       #'+workspace/close-window-or-workspace
    "C-C"     #'ace-delete-window)
@@ -298,19 +305,24 @@
  ;; rotate-text
  :n  "!"   #'rotate-text
  ;; hide-show/evil-matchit
- :nv "<tab>" #'+evil/matchit-or-toggle-fold
+ :nv [tab] #'+evil/matchit-or-toggle-fold
 
  ;; help-mode
  (:map help-mode-map
+   :n "q"   #'quit-window
+   :n "Q"   #'+ivy-quit-and-resume
    :n "]]"  #'help-go-forward
    :n "[["  #'help-go-back
    :n "o"   #'ace-link-help)
 
  (:map help-map
-   "l" #'find-library
-   "L" #'view-lossage
-   "h" #'describe-face  ; overwrite `view-hello-file'
-   "g" nil)) ; annoying to accidentally trigger
+   :desc "Describe face" "h"   #'describe-face ; overwrites `view-hello-file'
+   :desc "Face at point" "H"   #'doom/what-face
+   :desc "Minor-mode"    "M"   #'doom/what-minor-mode
+   :desc "Command log"   "W"   #'global-command-log-mode
+   :desc "Find library"  "l"   #'find-library
+   :desc "View lossage"  "L"   #'view-lossage
+   :desc "Describe char" "g"   #'describe-char)) ; overwrites `describe-gnu-project'
 
 
 ;;
@@ -321,6 +333,7 @@
 ;; properly, more like vim, or how I like it.
 
 (map! (:unless window-system "TAB" [tab]) ; Fix TAB in terminal
+      [S-iso-lefttab] [backtab]           ; Fix TAB in GNU Emacs
 
       ;; I want C-a and C-e to be a little smarter. C-a will jump to
       ;; indentation. Pressing it again will send you to the true bol. Same goes
@@ -333,7 +346,8 @@
       ;; textmate-esque newline insertion
       :i [M-return]     #'evil-open-below
       :i [S-M-return]   #'evil-open-above
-      ;; Textmate-esque newlines
+      ;; textmate-esque deletion
+      [M-backspace]     #'doom/backward-kill-to-bol-and-indent
       :i [backspace]    #'delete-backward-char
       :i [M-backspace]  #'doom/backward-kill-to-bol-and-indent
       ;; Emacsien motions for insert mode
@@ -364,6 +378,9 @@
       (:map messages-buffer-mode-map
         "M-;" #'eval-expression
         "A-;" #'eval-expression)
+
+      (:map tabulated-list-mode-map
+        [remap evil-record-macro] #'doom/popup-close-maybe)
 
       (:map (evil-ex-completion-map evil-ex-search-keymap read-expression-map)
         "C-a" #'move-beginning-of-line

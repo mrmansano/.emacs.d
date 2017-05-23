@@ -72,6 +72,7 @@
        crystal         ; ruby at the speed of c
        csharp          ; unity, .NET, and mono shenanigans
        data            ; config/data formats
+       elm             ; care for a cup of TEA?
        emacs-lisp      ; drown in parentheses
        go              ; the hipster dialect
        haskell         ; a language that's lazier than I am
@@ -83,6 +84,7 @@
        markdown        ; writing docs for people to ignore
        org             ; for organized fearless leader (WIP)
        php             ; make php less awful to work with
+       purescript      ; javascript, but functional
        python          ; beautiful is better than ugly
        rest            ; Emacs as a REST client
        ruby            ; 1.step do {|i| p "Ruby is #{i.even? ? 'love' : 'life'}"}

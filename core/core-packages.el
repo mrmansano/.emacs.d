@@ -1,39 +1,41 @@
 ;;; core-packages.el
 
-;; Emacs package management is opinionated. Unfortunately, so am I. With the
-;; help of `use-package', `quelpa' and package.el, DOOM Emacs manages its
-;; plugins and their dependencies through `doom/packages-install',
-;; `doom/packages-update' and `doom/packages-autoremove', which can be called
-;; via `make' on the command line (make {install,update,autoremove}).
+;; Emacs package management is opinionated. Unfortunately, so am I. I've bound
+;; together `use-package', `quelpa' and package.el to create my own,
+;; rolling-release, lazily-loaded package management system for Emacs.
 ;;
-;; My config is divided into two parts: configuration and packages.el files.
-;; You'll find packages.el files in each DOOM module (in `doom-modules-dir') and
-;; one in `doom-core-dir'. When executed, they fill `doom-packages' and
-;; `doom-modules', which are necessary for DOOM to extrapolate all kinds of
-;; information about plugins.
+;; The three key commands are `doom/packages-install', `doom/packages-update'
+;; and `doom/packages-autoremove', which can be called via `make' on the command
+;; line (make {install,update,autoremove}). These read packages.el files in each
+;; activated module in `doom-modules-dir' (and one in `doom-core-dir') which
+;; tell DOOM what plugins to install and where from.
 ;;
 ;; Why all the trouble? Because:
-;; 1. Scriptability: I want an alternative to package.el's list-packages
-;;    interface for updating and installing packages.
-;; 2. Flexibility: I sometimes want packages from sources other than ELPA. Like
-;;    github or the Emacs wiki, because certain plugins are out-of-date through
-;;    official channels, have changed hands unofficially, or simply haven't been
-;;    submitted to an ELPA repo yet.
-;; 3. Stability: I don't want to worry that each time I use my package
-;;    manager something might inexplicably go wrong. Cask, I'm looking at you.
-;; 4. Performance: A minor point, but it helps startup performance not to do
-;;    package.el initialization and package installation checks at startup.
-;; 5. Simplicity: Without Cask, I have no external dependencies to worry about
-;;    (unless you count make). DOOM handles itself. Arguably, my emacs.d is
-;;    overcomplicated, but configuring is simpler as a result (well, for me
-;;    anyway :P).
+;; 1. Scriptability: I live in the command line. I want a programmable
+;;    alternative to `list-packages' for updating and installing packages.
+;; 2. Flexibility: I want packages from sources other than ELPA. Primarily
+;;    github, because certain plugins are out-of-date through official channels,
+;;    have changed hands, or simply aren't in any ELPA repo.
+;; 3. Stability: I used Cask before this. It would error out with cyrptic errors
+;;    depending on the version of Emacs I used and the alignment of the planets.
+;;    No more.
+;; 4. Performance: A minor point, but this system is lazy-loaded (more so if you
+;;    byte-compile). Not having to initialize package.el (or check that your
+;;    packages are installed) every time you start up Emacs affords us precious
+;;    seconds.
+;; 5. Simplicity: No Cask, no external dependencies (unless you count make).
+;;    Arguably, this means my config is overcomplicated, but shhh, it's alright.
+;;    Everything is fine.
 ;;
-;; It should be safe to use package.el functionality, however, avoid
-;; `package-autoremove' as it will not reliably select the correct packages to
-;; delete.
+;; Technically, package.el commands should still work. To be absolutely sure,
+;; use the doom alternatives:
 ;;
-;; For complete certainty, I've provided DOOM alternatives of package commands,
-;; like `doom/install-package', `doom/delete-package' & `doom/update-packages'.
+;;    + `package-install':          `doom/install-package'
+;;    + `package-reinstall':        `doom/reinstall-package'
+;;    + `package-delete':           `doom/delete-package'
+;;    + `package-update':           `doom/update-package'
+;;    + `package-autoremove':       `doom/packages-autoremove'
+;;    + `package-refresh-contents': `doom/refresh-packages'
 ;;
 ;; See core/autoload/packages.el for more functions.
 
@@ -77,11 +79,17 @@ base by `doom!' and for calculating how many packages exist.")
       package-user-dir (expand-file-name "elpa" doom-packages-dir)
       package-enable-at-startup nil
       package-archives
-      '(("gnu"   . "http://elpa.gnu.org/packages/")
-        ("melpa" . "http://melpa.org/packages/")
-        ("org"   . "http://orgmode.org/elpa/"))
+      '(("gnu"   . "https://elpa.gnu.org/packages/")
+        ("melpa" . "https://melpa.org/packages/"))
       ;; I omit Marmalade because its packages are manually submitted rather
       ;; than pulled, so packages are often out of date with upstream.
+
+      ;; security settings
+      gnutls-verify-error (not (getenv "INSECURE")) ; INSECURE is for integrated testing
+      tls-checktrust gnutls-verify-error
+      tls-program (list "gnutls-cli --x509cafile %t -p %p %h"
+                        ;; less likely to be secure, but allow for backwards compatibility
+                        "openssl s_client -connect %h:%p -no_ssl2 -ign_eof")
 
       use-package-always-defer t
       use-package-always-ensure nil
@@ -95,6 +103,7 @@ base by `doom!' and for calculating how many packages exist.")
       quelpa-update-melpa-p nil
       quelpa-melpa-recipe-stores nil
       quelpa-self-upgrade-p nil
+      quelpa-verbose doom-debug-mode
       quelpa-dir (expand-file-name "quelpa" doom-packages-dir)
 
       byte-compile-dynamic nil
@@ -396,7 +405,8 @@ server, if necessary) by `doom/packages-install', `doom/packages-update' and
       (doom-initialize t)
       (doom/recompile)
       (message "Reloaded %d packages" (length doom--package-load-path))
-      (run-with-timer 1 nil #'redraw-frame))))
+      (run-with-timer 1 nil #'redraw-frame)
+      (run-hooks 'doom-reload-hook))))
 
 (defun doom/reload-autoloads ()
   "Refreshes the autoloads.el file, which tells Emacs where to find all the
@@ -408,6 +418,8 @@ In modules, checks modules/*/autoload.el and modules/*/autoload/*.el.
 Rerun this whenever init.el is modified. You can also use `make autoloads` from
 the commandline."
   (interactive)
+  ;; This function must not use `cl-lib', autoloaded functions or external
+  ;; dependencies. It must assume nothing is set up!
   (doom-initialize-packages (not noninteractive))
   (let ((generated-autoload-file doom-autoload-file)
         (autoload-files
@@ -536,6 +548,9 @@ package files."
 
 ;; Updates QUELPA after deleting a package
 (advice-add #'package-delete :after #'doom*package-delete)
+
+;; It isn't safe to use `package-autoremove', so get rid of it
+(advice-add #'package-autoremove :override #'doom/packages-autoremove)
 
 (provide 'core-packages)
 ;;; core-packages.el ends here

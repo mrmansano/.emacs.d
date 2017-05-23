@@ -5,7 +5,7 @@ TEST_EMACS=$(EMACS) --eval '(setq noninteractive nil)' $(EMACS_LIBS)
 TESTS=$(patsubst %,-l %, $(shell find test/ -type f -name 'test-*.el'))
 
 # Tasks
-all: autoloads install update
+all: autoloads autoremove install update
 
 install: init.el .local/autoloads.el
 	@$(EMACS) -f 'doom/packages-install'
@@ -40,18 +40,10 @@ test: init.el .local/autoloads.el
 test/%: init.el .local/autoloads.el
 	@$(TEST_EMACS) -l $@.el -f 'ert-run-tests-batch-and-exit'
 
+doctor:
+	@./bin/doctor
 
-# Syntactic sugar for bootstrapping modules. Allows: make bootstrap javascript
-# See doom/bootstrap for more information.
-ifeq (bootstrap,$(firstword $(MAKECMDGOALS)))
-  ARGV := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
-  $(eval $(ARGV):;@:)
-endif
-
-bootstrap: init.el .local/autoloads.el
-	@$(EMACS) --eval "(doom/bootstrap '($(ARGV)))"
-
-
+#
 init.el:
 	@[ -e init.el ] || $(error No init.el file; create one or copy init.example.el)
 
@@ -59,4 +51,4 @@ init.el:
 	@$(EMACS) -f 'doom-initialize-autoloads'
 
 
-.PHONY: all test bootstrap
+.PHONY: all test

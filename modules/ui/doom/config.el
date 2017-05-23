@@ -32,7 +32,7 @@
 ;; The native border "consumes" a pixel of the fringe on righter-most splits,
 ;; `window-divider' does not. Available since Emacs 25.1.
 (setq window-divider-default-places t
-      window-divider-default-bottom-width 0
+      window-divider-default-bottom-width 1
       window-divider-default-right-width 1)
 (window-divider-mode +1)
 
@@ -57,8 +57,8 @@
 
   ;; Dark frames by default
   (when (display-graphic-p)
-    (push (cons 'background-color (face-background 'default)) default-frame-alist)
-    (push (cons 'foreground-color (face-foreground 'default)) default-frame-alist))
+    (push (cons 'background-color (face-background 'default)) initial-frame-alist)
+    (push (cons 'foreground-color (face-foreground 'default)) initial-frame-alist))
 
   (defun +doom|buffer-mode-on ()
     "Enable `doom-buffer-mode' in buffers that are real (see
@@ -75,7 +75,22 @@
   (add-hook 'doom-popup-mode-hook #'+doom|buffer-mode-off)
 
   ;;
-  (add-hook '+workspaces-load-session-hook #'+doom|restore-bright-buffers))
+  (add-hook '+workspaces-load-session-hook #'+doom|restore-bright-buffers)
+
+  ;; Extra modes to activate doom-buffer-mode in
+  (add-hook! (gist-mode
+              twittering-mode
+              mu4e-view-mode
+              org-tree-slide-mode
+              +regex-mode)
+    #'doom-buffer-mode)
+
+  (after! neotree
+    (defun +doom|neotree-fix-popup ()
+      "Ensure the fringe settings are maintained on popup restore."
+      (neo-global--when-window
+        (doom--neotree-no-fringes)))
+    (add-hook 'doom-popup-mode-hook #'+doom|neotree-fix-popup nil t)))
 
 
 ;; Flashes the line around the cursor after any motion command that might
@@ -85,14 +100,19 @@
   :commands nav-flash-show
   :init
   (defun doom*blink-cursor-maybe (orig-fn &rest args)
-    "Blink line, to keep track of the cursor."
+    "Blink current line if the window has moved."
     (interactive)
-    (let ((point (point-marker)))
+    (let ((point (save-excursion (goto-char (window-start))
+                                 (point-marker))))
       (apply orig-fn args)
-      (unless (equal point (point-marker))
+      (unless (equal point
+                     (save-excursion (goto-char (window-start))
+                                     (point-marker)))
         (doom/blink-cursor))))
 
   (defun doom/blink-cursor (&rest _)
+    "Blink current line using `nav-flash'."
+    (interactive)
     (unless (minibufferp)
       (nav-flash-show)
       ;; only show in the current window
@@ -103,11 +123,12 @@
     #'doom/blink-cursor)
 
   (advice-add #'windmove-do-window-select :around #'doom*blink-cursor-maybe)
-  (advice-add #'recenter :after #'doom/blink-cursor)
+  (advice-add #'recenter :around #'doom*blink-cursor-maybe)
 
   (after! evil
-    (dolist (fn '(evil-window-bottom evil-window-middle evil-window-top))
-      (advice-add fn :around #'doom*blink-cursor-maybe))))
+    (advice-add #'evil-window-top    :after #'doom/blink-cursor)
+    (advice-add #'evil-window-middle :after #'doom/blink-cursor)
+    (advice-add #'evil-window-bottom :after #'doom/blink-cursor)))
 
 
 (after! hideshow
@@ -119,7 +140,7 @@
     "Face to hightlight `hideshow' overlays."
     :group 'doom)
 
-  ;; Nicer code-folding overlays
+  ;; Nicer code-folding overlays (with fringe indicators)
   (setq hs-set-up-overlay
         (lambda (ov)
           (when (eq 'code (overlay-get ov 'hs))
@@ -134,8 +155,15 @@
              ov 'display (propertize "  [...]  " 'face '+doom-folded-face))))))
 
 
-;; subtle diff indicators in the fringe
 (when (display-graphic-p)
+  (after! flycheck
+    ;; because git-gutter is in the left fringe
+    (setq flycheck-indication-mode 'right-fringe)
+    ;; A non-descript, left-pointing arrow
+    (define-fringe-bitmap 'flycheck-fringe-bitmap-double-arrow
+      [0 0 0 0 0 4 12 28 60 124 252 124 60 28 12 4 0 0 0 0]))
+
+  ;; subtle diff indicators in the fringe
   (after! git-gutter-fringe
     ;; places the git gutter outside the margins.
     (setq-default fringes-outside-margins t)
