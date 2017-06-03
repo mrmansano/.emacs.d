@@ -25,8 +25,11 @@
   (add-hook 'focus-in-hook #'git-gutter:update-all-windows)
 
   (after! evil
-    ;; Refresh git-gutter on ESC
-    (add-hook '+evil-esc-hook #'git-gutter)))
+    (defun +version-control|update-git-gutter ()
+      "Refresh git-gutter on ESC. Return nil to prevent shadowing other
+`+evil-esc-hook' hooks."
+      (ignore (git-gutter)))
+    (add-hook '+evil-esc-hook #'+version-control|update-git-gutter t)))
 
 
 (def-package! git-timemachine
@@ -62,15 +65,7 @@
   (advice-add #'git-timemachine-show-revision :after #'+vcs*update-header-line)
 
   ;; Force evil to rehash keybindings for the current state
-  (add-hook 'git-timemachine-mode-hook #'evil-force-normal-state)
-  (map! :map git-timemachine-mode-map
-        :nv "p" #'git-timemachine-show-previous-revision
-        :nv "n" #'git-timemachine-show-next-revision
-        :nv "g" #'git-timemachine-show-nth-revision
-        :nv "q" #'git-timemachine-quit
-        :nv "w" #'git-timemachine-kill-abbreviated-revision
-        :nv "W" #'git-timemachine-kill-revision
-        :nv "b" #'git-timemachine-blame))
+  (add-hook 'git-timemachine-mode-hook #'evil-force-normal-state))
 
 
 (def-package! magit
@@ -84,9 +79,5 @@
 (def-package! evil-magit
   :when (featurep! :feature evil)
   :after magit
-  :init (setq evil-magit-want-horizontal-movement t)
-  :config
-  (map! :map (magit-status-mode-map magit-revision-mode-map)
-        :n "C-j" nil
-        :n "C-k" nil))
+  :init (setq evil-magit-want-horizontal-movement t))
 

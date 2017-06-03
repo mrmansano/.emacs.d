@@ -12,18 +12,13 @@
 
   (set! :popup 'flycheck-error-list-mode :select t :autokill t)
 
-  (map! :map flycheck-error-list-mode-map
-        :n "C-n" #'flycheck-error-list-next-error
-        :n "C-p" #'flycheck-error-list-previous-error
-        :n "j"   #'flycheck-error-list-next-error
-        :n "k"   #'flycheck-error-list-previous-error
-        :n "RET" #'flycheck-error-list-goto-error)
-
   (after! evil
     ;; Flycheck buffer on ESC in normal mode.
     (defun +syntax-checkers|flycheck-buffer ()
-      (if flycheck-mode (ignore-errors (flycheck-buffer))))
-    (add-hook '+evil-esc-hook #'+syntax-checkers|flycheck-buffer)))
+      (when flycheck-mode
+        (ignore-errors (flycheck-buffer))
+        nil))
+    (add-hook '+evil-esc-hook #'+syntax-checkers|flycheck-buffer t)))
 
 
 (def-package! flycheck-pos-tip

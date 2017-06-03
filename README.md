@@ -8,7 +8,7 @@
   <img src="https://raw.githubusercontent.com/hlissner/.emacs.d/screenshots/cacochan.png" align="right" />
 </a>
 
-This is an Emacs configuration for a stubborn, melodramatic and shell-dwelling
+This is an Emacs configuration for a stubborn, shell-dwelling and melodramatic
 vimmer disappointed with the text-editor status quo.
 
 Doom tries to: look and act like modern editors (whatever that means to me on
@@ -16,7 +16,7 @@ any given day), espouse vim's modal philosophy as best it can and strive to
 surpass vim in any way possible. It fits my needs as a software developer, indie
 game developer, scientist and doom enthusiast.
 
-It was tailored for **Emacs 25.1+** on **MacOS 10.11+** and **Arch Linux 4.7+**.
+It was written for **Emacs 25.1+** on **MacOS 10.11+** and **Arch Linux 4.7+**.
 I use [vim] everywhere else.
 
 ## Installation
@@ -26,56 +26,85 @@ git clone https://github.com/hlissner/.emacs.d ~/.emacs.d
 cd ~/.emacs.d
 cp init.example.el init.el  # maybe edit init.el
 make install
-make compile       # optional, may take a while
-make compile-lite  # optional (lighter alternative to compile)
 
-# If you have problems, run this to diagnose any common problems
+# Have problems? Run this to check for common issues with your setup
 make doctor
 ```
 
-If you change `init.el` or add/remove functions to autoload files, run `make`.
-That is the equivalent of running:
+Once you've tweaked the config to your liking, you may optionally byte-compile
+it. DOOM is designed to benefit from this. It will boost startup times and make
+Emacs feel a bit snappier in general.
 
 ```bash
-make install       # or (doom/packages-install)
-make autoloads     # or (doom/reload-autoloads)
+make compile       # may take a while
+# or
+make compile-lite  # faster alternative; only compiles core files
+
+# If you byte-compile, changes to the config won't take effect until you
+# recompile or delete the byte-compiled files with:
+make clean
 ```
 
-You can run any Make command with `DEBUG=1` for added logging verbosity, and
-`YES=1` to auto-accept any confirmation prompts.
+## Package Management
+
+Plugins can be managed from the command line with `make`:
+
+```bash
+make install     # install missing plugins
+make update      # update installed plugins
+make autoremove  # remove unused plugins
+# be sure to run install and autoremove after modifying init.el
+
+# run this if you change autoload files
+make autoloads
+
+# this is the equivalent of running all four of the above commands
+make
+
+# you can run any make command with DEBUG=1 for extra logging, and YES=1 to
+# auto-accept confirmation prompts:
+DEBUG=1 make install
+YES=1 make update
+```
+
+These commands are also available from within Emacs:
+
++ `doom/packages-install`
++ `doom/packages-update`
++ `doom/packages-autoremove`
++ `doom/reload-autoloads`
 
 ## Deciphering my emacs.d
 
-So you want to grok some of this madness. Here are a few suggestions:
+So you want to grok this madness. Here are a few suggestions:
 
 * **[init.example.el](init.example.el)**: a birds eye view of available modules
-* **[modules/README.md](modules/README.md)**: a primer into module structure and
-  how the module system works.
+* **[modules/README.org](modules/README.org)**: a primer into module structure
 * **[modules/private/hlissner/+bindings.el](modules/private/hlissner/+bindings.el)**:
   my custom keybinds.
 * **[modules/private/hlissner/+commands.el](modules/private/hlissner/+commands.el)**:
-  my custom ex commands.
+  my custom ex-commands (for [evil-mode]).
 * **[modules/ui](modules/ui)**: the modules that makes my Emacs look the way it
   does, including [my theme][doom-theme], modeline, dashboard and more.
 * Find screenshots in the [screenshots branch][sc].
 
 ### Highlights
 
-* A [popup window management system](core/core-popups.el) using **[shackle]** to
+* A [popup management system](core/core-popups.el) using **[shackle]** to
   minimize mental context switching while dealing with temporary or disposable
   buffers.
 * Per-project code-style settings with **[editorconfig]**. Let someone else
-  argue about tabs versus spaces (spaces > tabs, btw).
-* Workspaces & session persistence with **[persp-mode]**. This provides tab
-  emulation that vaguely resembles vim tabs.
-* Project & workspace-aware buffer navigation and functions.
+  argue about tabs versus spaces (spaces, of course).
+* Workspaces & session persistence with **[persp-mode]**. Provides tab emulation
+  that vaguely resembles vim's tabs.
+* Project & workspace-restricted buffer navigation and functions.
 * A vim-centric environment with **[evil-mode]**
   * 2-character motions (ala vim-seek/vim-sneak) with **[evil-snipe]**
   * Sublime Text-esque [multiple cursors][sc-multiedit] with
     **[evil-mc]** and **[evil-multiedit]**
-  * Repeat (most) motions with <kbd>SPC</kbd> and
-    <kbd>shift</kbd>+<kbd>SPC</kbd> (backwards)
   * <kbd>C-x</kbd> omnicompletion in insert mode
+  * A better `:global` with buffer highlighting
+  * A slew of [custom ex commands](modules/private/hlissner/+commands.el)
 * Fast search utilities:
   * Project and buffer navigation with **[ivy]**
   * File browser sidebar with **[neotree]**
@@ -83,15 +112,15 @@ So you want to grok some of this madness. Here are a few suggestions:
     (see `:ag` and `:rg`)
   * Project search & replace with **[wgrep]**
   * Interactive buffer search with **[swiper]**
-* REPLs & inline/live code evaluation (using **[quickrun]**) with languages
-  support for Ruby, Python, PHP, JS, Elisp, Haskell, Lua and more.
+* Inline/live code evaluation (using **[quickrun]**) and REPLs for a variety of
+  languages, including Ruby, Python, PHP, JS, Elisp, Haskell, Lua and more.
 * [Minimalistic diffs in the fringe][sc-diffs] with **[git-gutter-fringe]**.
 * A do-what-I-mean jump-to-definition implementation that tries its darnest to
   find the definition of what you're looking at. It tries major-mode commands,
-  xref (experimental Emacs library) **[dumb-jump]**, ctags (WIP), then
-  **[counsel-ag]**.
-* Snippets and file-templates with **[yasnippet]**.
-* A smarter, perdier, Atom-inspired mode-line that includes:
+  xref (experimental Emacs library), **[dumb-jump]**, ctags (WIP), then
+  **[ripgrep][rg]** or **[the_silver_searcher][ag]**.
+* Snippets and file-templates with **[yasnippet]** & **[auto-yasnippet]**.
+* A smarter, perdier, Atom-inspired mode-line that adds:
   * evil-search/iedit/evil-substitute mode-line integration
   * Macro-recording indicator
   * Python/ruby version in mode-line (for rbenv/pyenv)
@@ -102,18 +131,29 @@ So you want to grok some of this madness. Here are a few suggestions:
   * RSS feed reader (using elfeed)
   * Word Processor (using LaTeX, Org and Markdown)
 
-## Contributing or troubleshooting
+## Troubleshooting
 
 My config wasn't intended for public use, but I'm happy to help you use or crib
-from my config. I welcome contributions of any kind; documentation, bug
-fixes/reports, even elisp tips.
+from it.
 
-[Don't hesitate to tell me my Elisp-fu sucks](https://github.com/hlissner/.emacs.d/issues/new)!
++ If you have questions, drop me a line at henrik@lissner.net.
++ If you have issues running or setting up DOOM, use `make doctor` to diagnose
+  any common problems.
++ If you still can't make sense of it, run `DEBUG=1 make doctor` and include
+  it [with your bug report][new-issue].
+
+**And please include steps to reproduce your issue, if possible.**
+
+## Contributing
+
+I welcome contributions of any kind: documentation, bug fixes/reports, extra
+modules, even elisp tips. Really,
+[don't hesitate to tell me my Elisp-fu sucks][new-issue]! I'm eager to learn.
 
 
 [ag]: https://github.com/ggreer/the_silver_searcher
+[auto-yasnippet]: https://melpa.org/#/auto-yasnippet
 [company-mode]: https://melpa.org/#/company
-[counsel-ag]: https://melpa.org/#/counsel
 [doom-theme]: https://github.com/hlissner/emacs-doom-theme
 [dumb-jump]: https://melpa.org/#/dumb-jump
 [editorconfig]: http://editorconfig.org/
@@ -124,6 +164,7 @@ fixes/reports, even elisp tips.
 [git-gutter-fringe]: https://melpa.org/#/git-gutter-fringe
 [ivy]: https://melpa.org/#/ivy
 [neotree]: https://melpa.org/#/neotree
+[new-issue]: https://github.com/hlissner/.emacs.d/issues/new
 [persp-mode]: https://melpa.org/#/persp-mode
 [quickrun]: https://melpa.org/#/quickrun
 [rg]: https://github.com/BurntSushi/ripgrep

@@ -68,20 +68,21 @@ is enabled/disabled.'")
           ("^\\*doom:" :regexp t :size 0.35 :noesc t :select t :modeline t)
           ("^\\*doom " :regexp t :noselect t :autokill t :autoclose t)
           ;; built-in (emacs)
-          ("*Backtrace*" :size 20 :noselect t)
-          ("*Warnings*" :size 5 :noselect t :autokill t :autoclose t)
-          ("*Messages*" :size 12 :noselect t :autokill nil)
-          ("*Help*" :size 0.3)
-          ("^\\*.*Shell Command.*\\*$" :regexp t :size 20 :noselect t :autokill t)
-          ("^\\*"  :regexp t :noselect t :autokill t)
-          ("^ \\*" :regexp t :size 12 :noselect t :autokill t :autoclose t)
           (apropos-mode :size 0.3 :autokill t :autoclose t)
           (Buffer-menu-mode :size 20 :autokill t)
           (comint-mode :noesc t)
           (grep-mode :size 25 :noselect t :autokill t)
           (profiler-report-mode :size 0.3 :regexp t :autokill t :modeline minimal)
           (tabulated-list-mode :noesc t)
-          (special-mode :noselect t :autokill t :autoclose t)))
+          (special-mode :noselect t :autokill t :autoclose t)
+          ("*info*" :size 0.5 :select t :autokill t)
+          ("*Backtrace*" :size 20 :noselect t)
+          ("*Warnings*" :size 5 :noselect t :autokill t :autoclose t)
+          ("*Messages*" :size 12 :noselect t :autokill nil)
+          ("*Help*" :size 0.3)
+          ("^\\*.*Shell Command.*\\*$" :regexp t :size 20 :noselect t :autokill t)
+          ("^\\*"  :regexp t :noselect t :autokill t)
+          ("^ \\*" :regexp t :size 12 :noselect t :autokill t :autoclose t)))
 
   :config
   (if (display-graphic-p)
@@ -253,7 +254,22 @@ properties."
       (doom-popup-buffer buf)
       (with-current-buffer buf
         (setq mode-line-format "Commands: d, s, x, u; f, o, 1, 2, m, v; ~, %; q to quit; ? for help."))))
-  (advice-add #'buffer-menu :override #'doom*buffer-menu))
+  (advice-add #'buffer-menu :override #'doom*buffer-menu)
+
+  (defun doom*suppress-pop-to-buffer-same-window (orig-fn &rest args)
+    (cl-letf (((symbol-function 'pop-to-buffer-same-window)
+               (symbol-function 'pop-to-buffer)))
+      (apply orig-fn args)))
+  (advice-add #'info :around #'doom*suppress-pop-to-buffer-same-window))
+
+
+(after! comint
+  (defun doom|popup-close-comint-buffer ()
+    (when (and (doom-popup-p)
+               (derived-mode-p 'comint-mode)
+               (not (process-live-p (get-buffer-process (current-buffer)))))
+      (delete-window)))
+  (add-hook '+evil-esc-hook #'doom|popup-close-comint-buffer t))
 
 
 (after! eshell
@@ -287,21 +303,14 @@ properties."
     (define-key map [remap evil-window-vsplit]           #'ignore))
 
   (defun doom|popup-close-maybe ()
-    "Close the current window if it's a popup with no :noesc property."
-    (when (and (doom-popup-p)
-               (not (doom-popup-prop :noesc)))
-      (delete-window)))
-  (add-hook '+evil-esc-hook #'doom|popup-close-maybe)
-
-  (defun doom|popup-close-all-maybe ()
-    "Close popups with an :autoclose property when pressing ESC from normal
-mode in any evil-mode buffer."
-    (unless (or (doom-popup-p)
-                (minibuffer-window-active-p (minibuffer-window))
-                (and (bound-and-true-p evil-mode)
-                     (evil-ex-hl-active-p 'evil-ex-search)))
-      (doom/popup-close-all)))
-  (add-hook '+evil-esc-hook #'doom|popup-close-all-maybe)
+    "If current window is a popup, close it. If minibuffer is open, close it. If
+not in a popup, close all popups with an :autoclose property."
+    (cond ((doom-popup-p)
+           (unless (doom-popup-prop :noesc)
+             (delete-window)))
+          (t
+           (doom/popup-close-all))))
+  (add-hook '+evil-esc-hook #'doom|popup-close-maybe t)
 
   ;; Make evil-mode cooperate with popups
   (advice-add #'evil-command-window :override #'doom*popup-evil-command-window)

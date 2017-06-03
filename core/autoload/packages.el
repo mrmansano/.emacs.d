@@ -7,21 +7,20 @@
 (defun doom-refresh-packages (&optional force-p)
   "Refresh ELPA packages."
   (doom-initialize)
-  (when (or force-p (getenv "DEBUG"))
+  (when force-p
     (doom-refresh-clear-cache))
-  (let ((last-refresh (persistent-soft-fetch 'last-pkg-refresh "emacs")))
-    (when last-refresh
-      (setq doom--last-refresh last-refresh)))
-  (when (or (not doom--last-refresh)
-            (> (nth 1 (time-since doom--last-refresh)) 900))
+  (unless (persistent-soft-fetch 'last-pkg-refresh "emacs")
     (condition-case ex
         (progn
-          (package-refresh-contents)
-          (persistent-soft-store
-           'last-pkg-refresh (setq doom--last-refresh (current-time))
-           "emacs"))
-    ('error
-     (doom-refresh-clear-cache)))))
+          (message "Refreshing package archives")
+          (package-refresh-contents (not doom-debug-mode))
+          (let ((i 0))
+            (while package--downloads-in-progress
+              (sleep-for 0 250))
+            (persistent-soft-store 'last-pkg-refresh t "emacs" 900)))
+    (error
+     (doom-refresh-clear-cache)
+     (message "Failed to refresh packages: %s" (cadr ex))))))
 
 ;;;###autoload
 (defun doom-refresh-clear-cache ()
@@ -32,7 +31,7 @@
 (defun doom-package-backend (name)
   "Get which backend the package NAME was installed with. Can either be elpa,
 quelpa or nil (if not installed)."
-  (doom-initialize)
+  (doom-initialize-packages)
   (cond ((let ((plist (cdr (assq name doom-packages))))
            (and (not (plist-get plist :pin))
                 (or (quelpa-setup-p)
@@ -50,20 +49,19 @@ quelpa or nil (if not installed)."
   "Determine whether NAME (a symbol) is outdated or not. If outdated, returns a
 list, whose car is NAME, and cdr the current version list and latest version
 list of the package."
-  (doom-initialize)
+  (doom-initialize-packages)
   (when-let (pkg (assq name package-alist))
     (let* ((old-version (package-desc-version (cadr pkg)))
            (new-version
             (pcase (doom-package-backend name)
               ('quelpa
-               (let ((recipe (plist-get (cdr (assq 'rotate-text doom-packages)) :recipe))
+               (let ((recipe (plist-get (cdr (assq name doom-packages)) :recipe))
                      (dir (expand-file-name (symbol-name name) quelpa-build-dir))
                      (inhibit-message (not doom-debug-mode)))
                  (if-let (ver (quelpa-checkout recipe dir))
                      (version-to-list ver)
                    old-version)))
               ('elpa
-               (doom-refresh-packages)
                (let ((desc (cadr (assq name package-archive-contents))))
                  (when (package-desc-p desc)
                    (package-desc-version desc)))))))
@@ -173,8 +171,9 @@ Used by `doom/packages-install'."
        (condition-case ex2
            (progn ,@body)
          ('file-error
-          (message! (bold (red "  Couldn't find %s\n  Trying again..." (cdr ex))))
-          (doom-refresh-packages)
+          (message! (bold (red "  FILE ERROR: %s" ex2)))
+          (message! "  Trying again...")
+          (doom-refresh-packages t)
           ,@body))
      ('user-error
       (message! (bold (red "  ERROR: %s" ex))))
@@ -199,7 +198,6 @@ Used by `doom/packages-install'."
 (defun doom-install-package (name &optional plist)
   "Installs package NAME with optional quelpa RECIPE (see `quelpa-recipe' for an
 example; the package name can be omitted)."
-  (doom-refresh-packages)
   (doom-initialize-packages)
   (when (package-installed-p name)
     (user-error "%s is already installed, skipping" name))
@@ -222,11 +220,21 @@ appropriate."
     (let ((inhibit-message (not doom-debug-mode)))
       (pcase (doom-package-backend name)
         ('quelpa
+         (or (quelpa-setup-p)
+             (error "Failed to initialize quelpa"))
          (let ((quelpa-upgrade-p t))
            (quelpa (assq name quelpa-cache))))
         ('elpa
-         (doom-delete-package name t)
-         (doom-install-package name))))
+         (let* ((desc    (cadr (assq name package-alist)))
+                (archive (cadr (assq name package-archive-contents)))
+                (packages
+                 (if (package-desc-p archive)
+                     (package-compute-transaction (list archive) (package-desc-reqs archive))
+                   (package-compute-transaction () (list (list archive))))))
+           (package-download-transaction packages)
+           (when-let (old-dir (package-desc-dir desc))
+             (when (file-directory-p old-dir)
+               (delete-directory old-dir t)))))))
     (version-list-=
      (package-desc-version (cadr (assq name package-alist)))
      (package-desc-version (cadr (assq name package-archive-contents))))))
@@ -273,7 +281,7 @@ appropriate."
            (message! (yellow "Aborted!")))
 
           (t
-           (doom-refresh-packages)
+           (doom-refresh-packages doom-debug-mode)
            (dolist (pkg packages)
              (message! "Installing %s" (car pkg))
              (doom--condition-case!
@@ -295,7 +303,7 @@ appropriate."
 (defun doom/packages-update ()
   "Interactive command for updating packages."
   (interactive)
-  (doom-refresh-packages)
+  (doom-refresh-packages doom-debug-mode)
   (let ((packages (sort (doom-get-outdated-packages) #'doom--sort-alpha)))
     (cond ((not packages)
            (message! (green "Everything is up-to-date")))
@@ -426,26 +434,4 @@ calls."
 FORCE-P (the universal argument) is set, ignore the cache."
   (declare (interactive-only t))
   (interactive "P")
-  (doom-refresh-packages t))
-
-;;;###autoload
-(defun doom/am-i-secure ()
-  "Test to see if your root certificates are securely configured in emacs."
-  (declare (interactive-only t))
-  (interactive)
-  (if-let (bad-hosts
-           (loop for bad
-                 in `("https://wrong.host.badssl.com/"
-                      "https://self-signed.badssl.com/")
-                 if (condition-case e
-                        (url-retrieve bad (lambda (retrieved) t))
-                      (error nil))
-                 collect bad))
-      (error (format "tls seems to be misconfigured (it got %s)."
-                     bad-hosts))
-    (url-retrieve "https://badssl.com"
-                  (lambda (status)
-                    (if (or (not status) (plist-member status :error))
-                        (warn "Something went wrong.\n\n%s" (pp-to-string status))
-                      (message "Your trust roots are set up properly.\n\n%s" (pp-to-string status))
-                      t)))))
+  (doom-refresh-packages force-p))

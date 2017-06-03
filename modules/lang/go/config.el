@@ -3,10 +3,15 @@
 (def-package! go-mode
   :mode "\\.go$"
   :interpreter "go"
-  :init
-  (add-hook 'go-mode-hook #'flycheck-mode)
-  (add-hook! go-mode (add-hook 'before-save-hook #'gofmt-before-save nil t))
   :config
+  (setq gofmt-command "goimports")
+
+  (add-hook 'go-mode-hook #'flycheck-mode)
+
+  (if (not (executable-find "goimports"))
+      (warn "go-mode: couldn't find goimports; no code formatting/fixed imports on save")
+    (add-hook! go-mode (add-hook 'before-save-hook #'gofmt-before-save nil t)))
+
   (set! :build 'go-build 'go-mode #'+go/build)
   (set! :repl 'go-mode #'gorepl-run)
 
@@ -40,24 +45,34 @@
             :n "n"  #'+go/test-nested))))
 
 
+(def-package! go-eldoc
+  :after go-mode
+  :commands go-eldoc-setup
+  :config (add-hook 'go-mode-hook #'go-eldoc-setup))
+
+
 (def-package! go-guru
   :commands (go-guru-describe go-guru-freevars go-guru-implements go-guru-peers
              go-guru-referrers go-guru-definition go-guru-pointsto
              go-guru-callstack go-guru-whicherrs go-guru-callers go-guru-callees
-             go-guru-expand-region))
-
-
-(def-package! company-go
-  :when (featurep! :completion company)
-  :after go-mode
-  :config (set! :company-backend 'go-mode '(company-go)))
-
-
-(def-package! go-eldoc
-  :commands go-eldoc-setup
-  :init (add-hook 'go-mode-hook #'go-eldoc-setup))
+             go-guru-expand-region)
+  :config
+  (unless (executable-find "guru")
+    (warn "go-mode: couldn't find guru, refactoring commands won't work")))
 
 
 (def-package! gorepl-mode
-  :commands (gorepl-run gorepl-run-load-current-file))
+  :commands (gorepl-run gorepl-run-load-current-file)
+  :config
+  (unless (executable-find "gore")
+    (warn "go-mode: couldn't find gore, REPL support disabled")))
 
+
+(def-package! company-go
+  :init (setq command-go-gocode-command "gocode")
+  :when (featurep! :completion company)
+  :after go-mode
+  :config
+  (if (executable-find command-go-gocode-command)
+      (set! :company-backend 'go-mode '(company-go))
+    (warn "go-mode: couldn't find gocode, code completion won't work")))

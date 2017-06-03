@@ -8,7 +8,7 @@
   "The font currently in use.")
 
 (defvar +doom-variable-pitch-font
-  (font-spec :family "Fira Sans" :size 13)
+  (font-spec :family "Fira Sans" :size 12)
   "The font currently in use.")
 
 (defvar +doom-unicode-font
@@ -43,6 +43,9 @@
   :config
   (load-theme +doom-theme t)
 
+  ;; nlinum line highlighting
+  (doom-themes-nlinum-config)
+
   ;; Add file icons to doom-neotree
   (doom-themes-neotree-config)
   (setq doom-neotree-enable-variable-pitch t
@@ -74,7 +77,7 @@
       (doom-buffer-mode -1)))
   (add-hook 'doom-popup-mode-hook #'+doom|buffer-mode-off)
 
-  ;;
+  ;; restore `doom-buffer-mode' when loading a persp-mode session
   (add-hook '+workspaces-load-session-hook #'+doom|restore-bright-buffers)
 
   ;; Extra modes to activate doom-buffer-mode in
@@ -99,7 +102,7 @@
 (def-package! nav-flash
   :commands nav-flash-show
   :init
-  (defun doom*blink-cursor-maybe (orig-fn &rest args)
+  (defun +doom*blink-cursor-maybe (orig-fn &rest args)
     "Blink current line if the window has moved."
     (interactive)
     (let ((point (save-excursion (goto-char (window-start))
@@ -108,9 +111,9 @@
       (unless (equal point
                      (save-excursion (goto-char (window-start))
                                      (point-marker)))
-        (doom/blink-cursor))))
+        (+doom/blink-cursor))))
 
-  (defun doom/blink-cursor (&rest _)
+  (defun +doom/blink-cursor (&rest _)
     "Blink current line using `nav-flash'."
     (interactive)
     (unless (minibufferp)
@@ -118,17 +121,17 @@
       ;; only show in the current window
       (overlay-put compilation-highlight-overlay 'window (selected-window))))
 
-  (add-hook!
-    '(imenu-after-jump-hook evil-jumps-post-jump-hook find-file-hook)
-    #'doom/blink-cursor)
+  ;; NOTE In :feature jump `recenter' is hooked to a bunch of jumping commands,
+  ;; which will trigger nav-flash.
 
-  (advice-add #'windmove-do-window-select :around #'doom*blink-cursor-maybe)
-  (advice-add #'recenter :around #'doom*blink-cursor-maybe)
+  (add-hook 'focus-in-hook #'+doom/blink-cursor)
+  (advice-add #'windmove-do-window-select :around #'+doom*blink-cursor-maybe)
+  (advice-add #'recenter :around #'+doom*blink-cursor-maybe)
 
   (after! evil
-    (advice-add #'evil-window-top    :after #'doom/blink-cursor)
-    (advice-add #'evil-window-middle :after #'doom/blink-cursor)
-    (advice-add #'evil-window-bottom :after #'doom/blink-cursor)))
+    (advice-add #'evil-window-top    :after #'+doom/blink-cursor)
+    (advice-add #'evil-window-middle :after #'+doom/blink-cursor)
+    (advice-add #'evil-window-bottom :after #'+doom/blink-cursor)))
 
 
 (after! hideshow
@@ -155,13 +158,20 @@
              ov 'display (propertize "  [...]  " 'face '+doom-folded-face))))))
 
 
-(when (display-graphic-p)
+(when (and (display-graphic-p) (fboundp 'define-fringe-bitmap))
+  ;; NOTE Adjust these bitmaps if you change `doom-ui-fringe-size'
   (after! flycheck
     ;; because git-gutter is in the left fringe
     (setq flycheck-indication-mode 'right-fringe)
     ;; A non-descript, left-pointing arrow
-    (define-fringe-bitmap 'flycheck-fringe-bitmap-double-arrow
-      [0 0 0 0 0 4 12 28 60 124 252 124 60 28 12 4 0 0 0 0]))
+    (fringe-helper-define 'flycheck-fringe-bitmap-double-arrow 'center
+      "...X...."
+      "..XX...."
+      ".XXX...."
+      "XXXX...."
+      ".XXX...."
+      "..XX...."
+      "...X...."))
 
   ;; subtle diff indicators in the fringe
   (after! git-gutter-fringe

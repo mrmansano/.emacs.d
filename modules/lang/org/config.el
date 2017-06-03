@@ -54,6 +54,9 @@
   (when (and (featurep 'evil) evil-mode)
     (evil-org-mode +1))
 
+  (require 'toc-org)
+  (toc-org-enable)
+
   (unless org-agenda-inhibit-startup
     ;; My version of the 'overview' #+STARTUP option: expand first-level
     ;; headings.
@@ -264,28 +267,28 @@
           "C-k" nil)
 
         (:map evil-org-mode-map
-          :n  "RET" #'+org/dwim-at-point
+          :n  "RET"   #'+org/dwim-at-point
           ;;
-          :ni "A-L" #'org-shiftmetaright
-          :ni "A-H" #'org-shiftmetaleft
-          :ni "A-K" #'org-shiftmetaup
-          :ni "A-J" #'org-shiftmetadown
+          :ni "A-L"   #'org-shiftmetaright
+          :ni "A-H"   #'org-shiftmetaleft
+          :ni "A-K"   #'org-shiftmetaup
+          :ni "A-J"   #'org-shiftmetadown
           ;; Expand tables (or shiftmeta move)
           :ni "C-S-l" #'+org/table-append-field-or-shift-right
           :ni "C-S-h" #'+org/table-prepend-field-or-shift-left
           :ni "C-S-k" #'+org/table-prepend-row-or-shift-up
           :ni "C-S-j" #'+org/table-append-row-or-shift-down
           ;; Navigate table cells
-          :i  "C-L" #'+org/table-next-field
-          :i  "C-H" #'+org/table-previous-field
-          :i  "C-K" #'+org/table-previous-row
-          :i  "C-J" #'+org/table-next-row
+          :i  "C-L"   #'+org/table-next-field
+          :i  "C-H"   #'+org/table-previous-field
+          :i  "C-K"   #'+org/table-previous-row
+          :i  "C-J"   #'+org/table-next-row
 
-          :i  "C-e" #'org-end-of-line
-          :i  "C-a" #'org-beginning-of-line
+          :i  "C-e"   #'org-end-of-line
+          :i  "C-a"   #'org-beginning-of-line
 
-          :i  [tab]           #'+org/indent-or-next-field-or-yas-expand
-          :i  [backtab]       #'+org/dedent-or-prev-field
+          :i  [tab]     #'+org/indent-or-next-field-or-yas-expand
+          :i  [backtab] #'+org/dedent-or-prev-field
 
           :n  [tab]     #'+org/toggle-fold
           :v  [backtab] #'+snippets/expand-on-region
@@ -336,15 +339,15 @@
           :n  "zO"  #'outline-show-all
           :n  "zr"  #'outline-show-all
 
-          :m  "]]"  (λ! (call-interactively #'org-forward-heading-same-level) (org-beginning-of-line))
-          :m  "[["  (λ! (call-interactively #'org-backward-heading-same-level) (org-beginning-of-line))
+          :m  "]]"  (λ! (org-forward-heading-same-level nil) (org-beginning-of-line))
+          :m  "[["  (λ! (org-backward-heading-same-level nil) (org-beginning-of-line))
           :m  "]l"  #'org-next-link
           :m  "[l"  #'org-previous-link
 
           :m  "gh"  #'outline-up-heading
           :m  "gj"  #'org-forward-heading-same-level
           :m  "gk"  #'org-backward-heading-same-level
-          :m  "gl"  (λ! (call-interactively #'outline-next-visible-heading) (show-children))
+          :m  "gl"  (λ! (call-interactively #'outline-next-visible-heading) (outline-show-children))
 
           :n  "go"  #'org-open-at-point
           :n  "gO"  (λ! (let ((org-link-frame-setup (append '((file . find-file-other-window)) org-link-frame-setup))
@@ -381,33 +384,7 @@
   ;; Remove highlights on ESC
   (defun +org|remove-occur-highlights (&rest args)
     (when (derived-mode-p 'org-mode)
-      (org-remove-occur-highlights)))
-  (add-hook '+evil-esc-hook #'+org|remove-occur-highlights)
-
-  (after! org-bullets
-    (define-minor-mode org-bullets-mode
-      "Modified version of `org-bullets-mode' that respects the `org-hide' face."
-      nil nil nil
-      (let* ((keyword
-              `((,org-outline-regexp-bol
-                 (0 (let ((level (- (match-end 0) (match-beginning 0) 1)))
-                      (compose-region (- (match-end 0) 2)
-                                      (- (match-end 0) 1)
-                                      (org-bullets-level-char level))
-                      (when (facep org-bullets-face-name)
-                        (put-text-property (- (match-end 0) 2)
-                                           (- (match-end 0) 1)
-                                           'face org-bullets-face-name))
-                      (put-text-property (match-beginning 0) (match-end 0)
-                                         'keymap org-bullets-bullet-map)
-                      nil))))))
-        (if org-bullets-mode
-            (progn (font-lock-add-keywords nil keyword)
-                   (font-lock-fontify-buffer))
-          (save-excursion
-            (goto-char (point-min))
-            (font-lock-remove-keywords nil keyword)
-            (while (re-search-forward org-outline-regexp-bol nil t)
-              (decompose-region (match-beginning 0) (match-end 0)))
-            (font-lock-fontify-buffer)))))))
+      (org-remove-occur-highlights)
+      t))
+  (add-hook '+evil-esc-hook #'+org|remove-occur-highlights))
 

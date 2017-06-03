@@ -5,7 +5,7 @@
 + [-] Work-in-progress
 + [X] Complete
 
-** Planned [6/76]
+** Planned [11/76]
 + [0/14] Potential plugins
   + [ ] completion/ivy: [[https://github.com/yevgnen/ivy-rich][ivy-rich]], possible replacement for my ivy-buffer modifications (undecided)
   + [ ] app/present: [[https://github.com/larstvei/Focus][focus]], for presenting code
@@ -26,7 +26,7 @@
   + [ ] app/irc
   + [-] app/crm
   + [-] app/write
-+ [6/58] Add README.org's (with working babel blocks?) to modules (see [[modules/lang/go/README.org][lang/go/README.org]]) to replace bootstaps
++ [11/58] Add README.org's (with working babel blocks?) to modules (see [[modules/lang/go/README.org][lang/go/README.org]]) to replace bootstaps
   + [0/9] :tools
     + [ ] dired
     + [ ] electric-indent
@@ -37,7 +37,7 @@
     + [ ] term
     + [ ] tmux
     + [ ] upload
-  + [3/25] :lang
+  + [5/25] :lang
     + [ ] assembly
     + [X] cc
     + [ ] crystal
@@ -45,7 +45,7 @@
     + [ ] data
     + [ ] emacs-lisp
     + [X] go
-    + [ ] haskell
+    + [X] haskell
     + [ ] java
     + [ ] javascript
     + [ ] julia
@@ -53,7 +53,7 @@
     + [ ] lua
     + [ ] markdown
     + [ ] org
-    + [ ] php
+    + [X] php
     + [ ] python
     + [X] rest
     + [ ] ruby
@@ -63,9 +63,9 @@
     + [ ] swift
     + [ ] typescript
     + [ ] web
-  + [0/10] :feature
+  + [1/10] :feature
     + [ ] debug
-    + [ ] eval
+    + [X] eval
     + [ ] evil
     + [ ] file-templates
     + [ ] jump
@@ -74,15 +74,15 @@
     + [ ] syntax-checker
     + [ ] version-control
     + [ ] workspaces
-  + [1/5] :ui
+  + [2/5] :ui
     + [X] doom
     + [ ] doom-dashboard
-    + [ ] doom-modeline
+    + [X] doom-modeline
     + [ ] doom-quit
     + [ ] hl-todo
-  + [1/4] :completion
+  + [2/4] :completion
     + [X] ivy
-    + [ ] company
+    + [X] company
     + [ ] ido
     + [ ] helm
   + [1/5] :app
@@ -92,9 +92,10 @@
     + [ ] twitter
     + [ ] present
 
-** 2.0.3 [37/65]
-+ [1/2] Finish module :: feature/jump (go-to-definition that just works)
-  + [ ] ggtags support
+** 2.0.3 [55/83]
++ [2/3] Finish module :: feature/jump (go-to-definition that just works)
+  + [ ] automatic tag generation
+  + [X] global tags support
   + [X] Fix fallback chain (xref => dumb-jump => ag/rg (?))
 + [1/13] New module :: tools/regex (PCRE IDE)
   + [X] perl backend
@@ -123,15 +124,32 @@
   + [X] don't move cursor when toggling folds
   + [X] don't move cursor when realigning org tables
 + [ ] feature/workspaces: don't save session if session is already blank
-+ [-] bin/org-alert: cron script that scans TODOs in org files and dispatches system alerts
++ [ ] bin/org-alert: cron script that scans TODOs in org files and dispatches system alerts
 + [ ] tools/upload: add ~+upload/open-remote-file~ command to open current file
       on the remote (with TRAMP)
 + [-] core-ui: replace (or fix) ~winner-mode~ (too unreliable with shackle)
 + [ ] Generalize ~doom-visual-bell~ by basing its background off a face
 + [ ] ui/doom-modeline: extend ~media-info~ segment for other media
-+ [ ] Write ~describe-setting~ for ~def-setting!~ definitions.
 + [ ] Fix invisible buffer-info segment in modeline for terminal Emacs
 + [ ] ui/doom-modeline: fix ~0/0~ display in modeline (leftover anzu state)
++ [ ] lang/php: automatic+async rebuild of tags (phpctags)
++ [X] Replace org-bullets source with more up-to-date fork
++ [X] Extract ~mode-name~ setters to ~doom-ui-mode-names~ in core/core-ui
++ [X] nav-flash: blink on focus-in
++ [X] Add ~:textobj~ keyword to ~map!~
++ [X] Make ~doom-refresh-packages~ async
++ [X] lang/emacs-lisp: omit macro forms from imenu index
++ [X] Switch back to nlinum #ui
++ [X] Revise keybinding design; perhaps something SPC oriented (like spacemacs)
++ [X] Write ~describe-module~ for DOOM modules.
++ [X] Write ~describe-setting~ for ~def-setting!~ definitions.
++ [X] evil-mc: add ~:mc~ ex command
++ [X] evil-mc: add visual-block support for making cursors
++ [X] evil-mc: replace ~evil-multiedit~ with ~evil-mc~ (?)
++ [X] feature/jump: recenter + blink after dumb-jump
++ [X] lang/haskell: add ~company-ghc~ completion support
++ [X] core-popup: stop on first ~+evil-esc-hook~ hook to return non-nil
++ [X] lang/php: add company-php
 + [X] Add :lookup ex command (~+jump:online~)
 + [X] Add :gblame ex command (~magit-blame~)
 + [X] Add :grevert ex command (~git-gutter:revert-hook~)

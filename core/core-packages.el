@@ -85,11 +85,12 @@ base by `doom!' and for calculating how many packages exist.")
       ;; than pulled, so packages are often out of date with upstream.
 
       ;; security settings
-      gnutls-verify-error (not (getenv "INSECURE")) ; INSECURE is for integrated testing
+      gnutls-verify-error (not (getenv "INSECURE")) ; you shouldn't use this
       tls-checktrust gnutls-verify-error
       tls-program (list "gnutls-cli --x509cafile %t -p %p %h"
-                        ;; less likely to be secure, but allow for backwards compatibility
-                        "openssl s_client -connect %h:%p -no_ssl2 -ign_eof")
+                        ;; compatibility fallbacks
+                        "gnutls-cli -p %p %h"
+                        "openssl s_client -connect %h:%p -no_ssl2 -no_ssl3 -ign_eof")
 
       use-package-always-defer t
       use-package-always-ensure nil
@@ -393,20 +394,18 @@ modify/update packages outside of emacs. Automatically called (through the
 server, if necessary) by `doom/packages-install', `doom/packages-update' and
 `doom/packages-autoremove'. "
   (interactive)
-  (if noninteractive
-      (progn
-        (message "Reloading...")
-        (require 'server)
-        (unless (ignore-errors (server-eval-at "server" '(doom/reload t)))
-          (message "Recompiling")
-          (doom/recompile)))
-    (if ignorable-p
-        (message "Ignored a reload request from server")
-      (doom-initialize t)
-      (doom/recompile)
-      (message "Reloaded %d packages" (length doom--package-load-path))
-      (run-with-timer 1 nil #'redraw-frame)
-      (run-hooks 'doom-reload-hook))))
+  (cond (noninteractive
+         (message "Reloading...")
+         (require 'server)
+         (unless (ignore-errors (server-eval-at "server" '(doom/reload t)))
+           (message "Recompiling")
+           (doom/recompile)))
+        (t
+         (doom-initialize t)
+         (doom/recompile)
+         (message "Reloaded %d packages" (length doom--package-load-path))
+         (run-with-timer 1 nil #'redraw-display)
+         (run-hooks 'doom-reload-hook))))
 
 (defun doom/reload-autoloads ()
   "Refreshes the autoloads.el file, which tells Emacs where to find all the
@@ -432,9 +431,9 @@ the commandline."
           (push auto-file autoload-files))
         (when (file-directory-p auto-dir)
           (mapc (lambda (file)
-                  ;; Make evil.el autoload files a special case; don't load them
-                  ;; unless evil is enabled.
-                  (unless (and (equal (file-name-nondirectory file) "evil.el")
+                  ;; Make evil*.el autoload files a special case; don't load
+                  ;; them unless evil is enabled.
+                  (unless (and (string-prefix-p "evil" (file-name-nondirectory file))
                                (not (featurep! :feature evil)))
                     (push file autoload-files)))
                 (file-expand-wildcards (expand-file-name "*.el" auto-dir) t)))))
@@ -535,11 +534,16 @@ components to feel its effects."
   "Delete all compiled elc files in DOOM emacs, excluding compiled ELPA/QUELPA
 package files."
   (interactive)
-  (when-let (elc-files (cl-remove-if (lambda (file) (file-in-directory-p file doom-local-dir))
-                                     (directory-files-recursively doom-emacs-dir "\\.elc$")))
-    (dolist (file elc-files)
-      (delete-file file)
-      (message "Deleting %s" (file-relative-name file doom-emacs-dir)))))
+  (if-let (elc-files
+           (append
+            (let ((init-elc (expand-file-name "init.elc" doom-emacs-dir)))
+              (if (file-exists-p init-elc) (list init-elc)))
+            (directory-files-recursively doom-core-dir "\\.elc$")
+            (directory-files-recursively doom-modules-dir "\\.elc$")))
+      (dolist (file elc-files)
+        (delete-file file)
+        (message "Deleting %s" (file-relative-name file doom-emacs-dir)))
+    (message "Everything is clean")))
 
 
 ;;
