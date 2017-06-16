@@ -1,4 +1,4 @@
-;;; feature/jump/config.el
+;;; feature/jump/config.el -*- lexical-binding: t; -*-
 
 ;; "What am I looking at?"
 ;;
@@ -36,7 +36,7 @@ produces an url. Used by `+jump/online'.")
 (add-hook!
   '(imenu-after-jump-hook evil-jumps-post-jump-hook
     counsel-grep-post-action-hook dumb-jump-after-jump-hook)
-  'recenter)
+  #'recenter)
 
 
 ;;

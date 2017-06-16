@@ -1,14 +1,9 @@
-;;; core-os.el
+;;; core-os.el -*- lexical-binding: t; -*-
 
 (defconst IS-MAC   (eq system-type 'darwin))
 (defconst IS-LINUX (eq system-type 'gnu/linux))
 
-;; In case this config is shared across multiple computers (like mine are),
-;; let's protect these from autoremoval.
-(push 'exec-path-from-shell doom-protected-packages)
-(push 'osx-clipboard doom-protected-packages)
-
- ;; clipboard
+;; clipboard
 (setq x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING)
       ;; Use a shared clipboard
       select-enable-clipboard t
@@ -47,7 +42,6 @@
                                   exec-path-from-shell-arguments (delete "-i" exec-path-from-shell-arguments))
                             (nconc exec-path-from-shell-variables '("GOPATH" "GOROOT" "PYTHONPATH"))
                             (exec-path-from-shell-initialize)
-                            (persistent-soft-store 'exec-path exec-path "emacs")
                             exec-path))
                         exec-path)))
              (t

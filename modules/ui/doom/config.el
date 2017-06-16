@@ -1,4 +1,4 @@
-;;; ui/doom/config.el
+;;; ui/doom/config.el -*- lexical-binding: t; -*-
 
 (defvar +doom-theme 'doom-one
   "The color theme to use.")
@@ -13,72 +13,73 @@
 
 (defvar +doom-unicode-font
   (font-spec :family "DejaVu Sans Mono" :size 12)
-  "Fallback font for unicode glyphs.")
+  "Fallback font for unicode glyphs. Is ignored if :feature unicode is active.")
 
 
-;;; Set fonts
-(when (display-graphic-p)
+;; Getting themes to remain consistent across GUI Emacs, terminal Emacs and
+;; daemon Emacs is hairy.
+;;
+;; + Running `+doom|init' directly sorts out the initial GUI frame.
+;; + Attaching it to `after-make-frame-functions' sorts out daemon Emacs.
+;; + Terminal Emacs is a bit of a wildcard.
+(defun +doom|init (&optional frame)
+  "Set the theme and load the font, in that order."
+  (load-theme +doom-theme t)
+
   (with-demoted-errors "FONT ERROR: %s"
-    (set-frame-font +doom-font t t)
+    (set-frame-font +doom-font nil (if frame (list frame) t))
     ;; Fallback to `doom-unicode-font' for Unicode characters
-    (when +doom-unicode-font
-      (set-fontset-font t 'unicode +doom-unicode-font))
+    (unless (featurep! :ui unicode)
+      (when +doom-unicode-font
+        (set-fontset-font t 'unicode +doom-unicode-font frame)))
     ;; ...and for variable-pitch mode
     (when +doom-variable-pitch-font
-      (set-face-attribute 'variable-pitch nil :font +doom-variable-pitch-font))))
+      (set-face-attribute 'variable-pitch frame :font +doom-variable-pitch-font))))
 
+(defun +doom|init-daemon (frame)
+  (when (or (daemonp) (not (display-graphic-p)))
+    (with-selected-frame frame
+      (run-with-timer 0 nil #'+doom|init))))
 
-;;; More reliable inter-window border
-;; The native border "consumes" a pixel of the fringe on righter-most splits,
-;; `window-divider' does not. Available since Emacs 25.1.
-(setq window-divider-default-places t
-      window-divider-default-bottom-width 1
-      window-divider-default-right-width 1)
-(window-divider-mode +1)
+(add-hook 'after-make-frame-functions #'+doom|init)
+(add-hook 'after-make-frame-functions #'+doom|init-daemon)
 
 
 ;; doom-one: gives Emacs a look inspired by Dark One in Atom.
 ;; <https://github.com/hlissner/emacs-doom-theme>
-(def-package! doom-themes :demand t
+(def-package! doom-themes
+  :load-path "~/work/plugins/emacs-doom-themes/"
+  :demand t
   :config
-  (load-theme +doom-theme t)
-
-  ;; nlinum line highlighting
-  (doom-themes-nlinum-config)
-
+  (+doom|init)
+  ;; blink mode-line on errors
+  (add-hook 'doom-post-init-hook #'doom-themes-visual-bell-config)
   ;; Add file icons to doom-neotree
-  (doom-themes-neotree-config)
+  (add-hook 'doom-post-init-hook #'doom-themes-neotree-config)
   (setq doom-neotree-enable-variable-pitch t
         doom-neotree-file-icons 'simple
         doom-neotree-line-spacing 2)
 
-  ;; Since Fira Mono doesn't have an italicized variant, highlight it instead
-  (set-face-attribute 'italic nil
-                      :weight 'ultra-light
-                      :foreground "#ffffff"
-                      :background (face-background 'doom-hl-line))
+  (after! neotree
+    (defun +doom|neotree-fix-popup ()
+      "Ensure the fringe settings are maintained on popup restore."
+      (neo-global--when-window
+        (doom--neotree-no-fringes)))
+    (add-hook 'doom-popup-mode-hook #'+doom|neotree-fix-popup)))
 
-  ;; Dark frames by default
-  (when (display-graphic-p)
-    (push (cons 'background-color (face-background 'default)) initial-frame-alist)
-    (push (cons 'foreground-color (face-foreground 'default)) initial-frame-alist))
 
-  (defun +doom|buffer-mode-on ()
-    "Enable `doom-buffer-mode' in buffers that are real (see
-`doom-real-buffer-p')."
-    (when (and (not doom-buffer-mode)
-               (doom-real-buffer-p))
-      (doom-buffer-mode +1)))
-  (add-hook 'after-change-major-mode-hook #'+doom|buffer-mode-on)
+(def-package! solaire-mode
+  :commands (solaire-mode turn-on-solaire-mode turn-off-solaire-mode)
+  :init
+  (add-hook 'after-change-major-mode-hook #'turn-on-solaire-mode)
+  (add-hook 'doom-popup-mode-hook #'turn-off-solaire-mode)
+  :config
+  (setq solaire-mode-real-buffer-fn #'doom-real-buffer-p)
 
-  (defun +doom|buffer-mode-off ()
-    "Disable `doom-buffer-mode' in popup buffers."
-    (when doom-buffer-mode
-      (doom-buffer-mode -1)))
-  (add-hook 'doom-popup-mode-hook #'+doom|buffer-mode-off)
-
-  ;; restore `doom-buffer-mode' when loading a persp-mode session
-  (add-hook '+workspaces-load-session-hook #'+doom|restore-bright-buffers)
+  ;; Prevent color glitches when reloading either DOOM or the theme
+  (defun +doom|reset-solaire-mode (&rest _) (solaire-mode-reset))
+  (advice-add #'load-theme :after #'+doom|reset-solaire-mode)
+  (add-hook 'doom-reload-hook #'solaire-mode-reset)
 
   ;; Extra modes to activate doom-buffer-mode in
   (add-hook! (gist-mode
@@ -86,60 +87,15 @@
               mu4e-view-mode
               org-tree-slide-mode
               +regex-mode)
-    #'doom-buffer-mode)
-
-  (after! neotree
-    (defun +doom|neotree-fix-popup ()
-      "Ensure the fringe settings are maintained on popup restore."
-      (neo-global--when-window
-        (doom--neotree-no-fringes)))
-    (add-hook 'doom-popup-mode-hook #'+doom|neotree-fix-popup nil t)))
-
-
-;; Flashes the line around the cursor after any motion command that might
-;; reasonably send the cursor somewhere the eyes can't follow. Tremendously
-;; helpful on a 30" 2560x1600 display.
-(def-package! nav-flash
-  :commands nav-flash-show
-  :init
-  (defun +doom*blink-cursor-maybe (orig-fn &rest args)
-    "Blink current line if the window has moved."
-    (interactive)
-    (let ((point (save-excursion (goto-char (window-start))
-                                 (point-marker))))
-      (apply orig-fn args)
-      (unless (equal point
-                     (save-excursion (goto-char (window-start))
-                                     (point-marker)))
-        (+doom/blink-cursor))))
-
-  (defun +doom/blink-cursor (&rest _)
-    "Blink current line using `nav-flash'."
-    (interactive)
-    (unless (minibufferp)
-      (nav-flash-show)
-      ;; only show in the current window
-      (overlay-put compilation-highlight-overlay 'window (selected-window))))
-
-  ;; NOTE In :feature jump `recenter' is hooked to a bunch of jumping commands,
-  ;; which will trigger nav-flash.
-
-  (add-hook 'focus-in-hook #'+doom/blink-cursor)
-  (advice-add #'windmove-do-window-select :around #'+doom*blink-cursor-maybe)
-  (advice-add #'recenter :around #'+doom*blink-cursor-maybe)
-
-  (after! evil
-    (advice-add #'evil-window-top    :after #'+doom/blink-cursor)
-    (advice-add #'evil-window-middle :after #'+doom/blink-cursor)
-    (advice-add #'evil-window-bottom :after #'+doom/blink-cursor)))
+    #'solaire-mode))
 
 
 (after! hideshow
   (defface +doom-folded-face
     `((((background dark))
-       (:inherit font-lock-comment-face :background ,(doom-color 'black)))
+       (:inherit font-lock-comment-face :background ,(doom-color 'base0)))
       (((background light))
-       (:inherit font-lock-comment-face :background ,(doom-color 'light-grey))))
+       (:inherit font-lock-comment-face :background ,(doom-color 'base3))))
     "Face to hightlight `hideshow' overlays."
     :group 'doom)
 
@@ -158,32 +114,31 @@
              ov 'display (propertize "  [...]  " 'face '+doom-folded-face))))))
 
 
-(when (and (display-graphic-p) (fboundp 'define-fringe-bitmap))
-  ;; NOTE Adjust these bitmaps if you change `doom-ui-fringe-size'
-  (after! flycheck
-    ;; because git-gutter is in the left fringe
-    (setq flycheck-indication-mode 'right-fringe)
-    ;; A non-descript, left-pointing arrow
-    (fringe-helper-define 'flycheck-fringe-bitmap-double-arrow 'center
-      "...X...."
-      "..XX...."
-      ".XXX...."
-      "XXXX...."
-      ".XXX...."
-      "..XX...."
-      "...X...."))
+;; NOTE Adjust these bitmaps if you change `doom-ui-fringe-size'
+(after! flycheck
+  ;; because git-gutter is in the left fringe
+  (setq flycheck-indication-mode 'right-fringe)
+  ;; A non-descript, left-pointing arrow
+  (fringe-helper-define 'flycheck-fringe-bitmap-double-arrow 'center
+    "...X...."
+    "..XX...."
+    ".XXX...."
+    "XXXX...."
+    ".XXX...."
+    "..XX...."
+    "...X...."))
 
-  ;; subtle diff indicators in the fringe
-  (after! git-gutter-fringe
-    ;; places the git gutter outside the margins.
-    (setq-default fringes-outside-margins t)
-    ;; thin fringe bitmaps
-    (fringe-helper-define 'git-gutter-fr:added '(center repeated)
-      "XXX.....")
-    (fringe-helper-define 'git-gutter-fr:modified '(center repeated)
-      "XXX.....")
-    (fringe-helper-define 'git-gutter-fr:deleted 'bottom
-      "X......."
-      "XX......"
-      "XXX....."
-      "XXXX....")))
+;; subtle diff indicators in the fringe
+(after! git-gutter-fringe
+  ;; places the git gutter outside the margins.
+  (setq-default fringes-outside-margins t)
+  ;; thin fringe bitmaps
+  (fringe-helper-define 'git-gutter-fr:added '(center repeated)
+    "XXX.....")
+  (fringe-helper-define 'git-gutter-fr:modified '(center repeated)
+    "XXX.....")
+  (fringe-helper-define 'git-gutter-fr:deleted 'bottom
+    "X......."
+    "XX......"
+    "XXX....."
+    "XXXX...."))

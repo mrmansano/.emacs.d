@@ -1,4 +1,4 @@
-;;; private/hlissner/config.el
+;;; private/hlissner/config.el -*- lexical-binding: t; -*-
 
 (when (featurep 'evil)
   (load! +bindings)  ; my key bindings
@@ -10,9 +10,7 @@
 (defvar +hlissner-snippets-dir
   (expand-file-name "snippets/" +hlissner-dir))
 
-(setq user-mail-address "henrik@lissner.net"
-      user-full-name "Henrik Lissner"
-      epa-file-encrypt-to user-mail-address
+(setq epa-file-encrypt-to user-mail-address
       auth-sources (list (expand-file-name ".authinfo.gpg" +hlissner-dir)))
 
 (defun +hlissner*no-authinfo-for-tramp (orig-fn &rest args)
@@ -20,6 +18,22 @@
   (let ((auth-sources (if (equal tramp-current-method "sudo") nil auth-sources)))
     (apply orig-fn args)))
 (advice-add #'tramp-read-passwd :around #'+hlissner*no-authinfo-for-tramp)
+
+
+(after! doom-themes
+  ;; Since Fira Mono doesn't have an italicized variant, highlight it instead
+  (set-face-attribute 'italic nil
+                      :weight 'ultra-light
+                      :foreground "#ffffff"
+                      :background (doom-color 'current-line)))
+
+
+(after! evil-mc
+  ;; if I'm in insert mode, chances are I want cursors to resume
+  (add-hook! 'evil-mc-before-cursors-created
+    (add-hook 'evil-insert-state-entry-hook #'evil-mc-resume-cursors nil t))
+  (add-hook! 'evil-mc-after-cursors-deleted
+    (remove-hook 'evil-insert-state-entry-hook #'evil-mc-resume-cursors t)))
 
 
 ;; Don't use default snippets, use mine.

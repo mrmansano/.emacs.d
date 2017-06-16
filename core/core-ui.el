@@ -1,4 +1,4 @@
-;; core-ui.el --- draw me like one of your French editors
+;;; core-ui.el -*- lexical-binding: t; -*-
 
 (defvar doom-ui-fringe-size '4 "Default fringe width")
 
@@ -14,44 +14,53 @@
  image-animate-loop t
  indicate-buffer-boundaries nil
  indicate-empty-lines nil
+ max-mini-window-height 0.3
+ mode-line-default-help-echo nil ; disable mode-line mouseovers
+ mouse-yank-at-point t           ; middle-click paste at point, not at click
+ resize-mini-windows 'grow-only  ; Minibuffer resizing
+ show-help-function nil          ; hide :help-echo text
+ split-width-threshold nil       ; favor horizontal splits
+ uniquify-buffer-name-style 'forward
+ use-dialog-box nil              ; always avoid GUI
+ visible-cursor nil
+ x-stretch-cursor nil
+ ;; defer jit font locking slightly to [try to] improve Emacs performance
  jit-lock-defer-time nil
  jit-lock-stealth-nice 0.1
  jit-lock-stealth-time 0.2
  jit-lock-stealth-verbose nil
- max-mini-window-height 0.3
- mode-line-default-help-echo nil  ; disable mode-line mouseovers
- mouse-yank-at-point t          ; middle-click paste at point, not at click
- resize-mini-windows 'grow-only ; Minibuffer resizing
- show-help-function nil         ; hide :help-echo text
- split-width-threshold nil      ; favor horizontal splits
- uniquify-buffer-name-style 'forward
- use-dialog-box nil             ; always avoid GUI
- visible-cursor nil
- x-stretch-cursor nil
  ;; `pos-tip' defaults
  pos-tip-internal-border-width 6
  pos-tip-border-width 1
  ;; no beeping or blinking please
  ring-bell-function #'ignore
- visible-bell nil
- ;; Ask for confirmation on quit only if real buffers exist
- confirm-kill-emacs (lambda (_) (if (doom-real-buffers-list) (y-or-n-p "››› Quit?") t)))
+ visible-bell nil)
 
 (fset #'yes-or-no-p #'y-or-n-p) ; y/n instead of yes/no
 
-;; auto-enabled in Emacs 25+; I'd rather enable it manually
-(global-eldoc-mode -1)
+(defun doom-quit-p (&optional prompt)
+  "Return t if this session should be killed, but not before it prompts the user
+for confirmation."
+  (interactive)
+  (if (ignore-errors (doom-real-buffers-list))
+      (or (yes-or-no-p (format "››› %s" (or prompt "Quit Emacs?")))
+          (ignore (message "Aborted")))
+    t))
+(setq confirm-kill-emacs nil)
+(add-hook 'kill-emacs-query-functions #'doom-quit-p)
 
 ;; show typed keystrokes in minibuffer
-(setq echo-keystrokes 0.02)
+(defun doom|enable-ui-keystrokes ()  (setq echo-keystrokes 0.02))
+(defun doom|disable-ui-keystrokes () (setq echo-keystrokes 0))
+(doom|enable-ui-keystrokes)
 ;; ...but hide them while isearch is active
-(add-hook! isearch-mode     (setq echo-keystrokes 0))
-(add-hook! isearch-mode-end (setq echo-keystrokes 0.02))
+(add-hook 'isearch-mode-hook     #'doom|disable-ui-keystrokes)
+(add-hook 'isearch-mode-end-hook #'doom|enable-ui-keystrokes)
 
 ;; A minor mode for toggling the mode-line
 (defvar-local doom--modeline-format nil
   "The modeline format to use when `doom-hide-modeline-mode' is active. Don't
-set this directly. Bind it in `let' instead.")
+set this directly. Let-bind it instead.")
 (defvar-local doom--old-modeline-format nil
   "The old modeline format, so `doom-hide-modeline-mode' can revert when it's
 disabled.")
@@ -86,14 +95,22 @@ local value, whether or not it's permanent-local. Therefore, we cycle
 
 ;; undo/redo changes to Emacs' window layout
 (defvar winner-dont-bind-my-keys t) ; I'll bind keys myself
-(require 'winner)
-(add-hook 'window-setup-hook #'winner-mode)
+(autoload 'winner-mode "winner" nil t)
+(add-hook 'doom-init-hook #'winner-mode)
 
 ;; highlight matching delimiters
 (setq show-paren-delay 0.1
       show-paren-highlight-openparen t
       show-paren-when-point-inside-paren t)
-(show-paren-mode +1)
+(add-hook 'doom-init-hook #'show-paren-mode)
+
+;;; More reliable inter-window border
+;; The native border "consumes" a pixel of the fringe on righter-most splits,
+;; `window-divider' does not. Available since Emacs 25.1.
+(setq-default window-divider-default-places t
+              window-divider-default-bottom-width 1
+              window-divider-default-right-width 1)
+(add-hook 'doom-init-hook #'window-divider-mode)
 
 ;; like diminish, but for major-modes. [pedantry intensifies]
 (defvar doom-ui-mode-names
@@ -113,24 +130,59 @@ mode is detected.")
 ;; Bootstrap
 ;;
 
+;; smoother startup when mode-line is invisible
+(setq mode-line-format nil)
+
+;; Prompts the user for confirmation when deleting a non-empty frame
+(define-key global-map [remap delete-frame] #'doom/delete-frame)
+
+(global-eldoc-mode -1) ; auto-enabled in Emacs 25+; I'll do it myself
+(blink-cursor-mode +1) ; a good indicator that Emacs isn't frozen
+
+;; draw me like one of your French editors
 (tooltip-mode -1) ; relegate tooltips to echo area only
 (menu-bar-mode -1)
-(tool-bar-mode -1)
-(when (display-graphic-p)
-  (scroll-bar-mode -1)
-  ;; buffer name  in frame title
-  (setq-default frame-title-format '("DOOM Emacs"))
-  ;; standardize fringe width
-  (push (cons 'left-fringe  doom-ui-fringe-size) default-frame-alist)
-  (push (cons 'right-fringe doom-ui-fringe-size) default-frame-alist)
-  ;; no fringe in the minibuffer
-  (add-hook! (emacs-startup minibuffer-setup)
-    (set-window-fringes (minibuffer-window) 0 0 nil)))
+(if (fboundp 'tool-bar-mode)   (tool-bar-mode -1))
+(if (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
+
+;; buffer name in frame title
+(setq-default frame-title-format '("DOOM Emacs"))
+;; standardize fringe width
+(push (cons 'left-fringe  doom-ui-fringe-size) default-frame-alist)
+(push (cons 'right-fringe doom-ui-fringe-size) default-frame-alist)
+;; no fringe in the minibuffer
+(defun doom|no-fringes-in-minibuffer ()
+  (set-window-fringes (minibuffer-window) 0 0 nil))
+(add-hook! '(doom-init-hook minibuffer-setup-hook)
+  #'doom|no-fringes-in-minibuffer)
 
 
 ;;
 ;; Plugins
 ;;
+
+(def-package! all-the-icons
+  :commands (all-the-icons-octicon all-the-icons-faicon all-the-icons-fileicon
+             all-the-icons-wicon all-the-icons-material all-the-icons-alltheicon
+             all-the-icons-install-fonts)
+  :init
+  (defun doom*disable-all-the-icons-in-tty (orig-fn &rest args)
+    (when (display-graphic-p)
+      (apply orig-fn args)))
+
+  ;; all-the-icons doesn't work in the terminal, so we "disable" it.
+  (advice-add #'all-the-icons-octicon    :around #'doom*disable-all-the-icons-in-tty)
+  (advice-add #'all-the-icons-material   :around #'doom*disable-all-the-icons-in-tty)
+  (advice-add #'all-the-icons-faicon     :around #'doom*disable-all-the-icons-in-tty)
+  (advice-add #'all-the-icons-fileicon   :around #'doom*disable-all-the-icons-in-tty)
+  (advice-add #'all-the-icons-wicon      :around #'doom*disable-all-the-icons-in-tty)
+  (advice-add #'all-the-icons-alltheicon :around #'doom*disable-all-the-icons-in-tty))
+
+(def-package! fringe-helper
+  :commands (fringe-helper-define fringe-helper-convert)
+  :init
+  (unless (fboundp 'define-fringe-bitmap)
+    (fset 'define-fringe-bitmap (lambda (&rest _)))))
 
 (def-package! hideshow ; built-in
   :commands (hs-minor-mode hs-toggle-hiding hs-already-hidden-p)
@@ -151,12 +203,11 @@ file."
                             (list (region-beginning) (region-end))
                           (list nil nil))))
     (unless indent-tabs-mode
-      (save-match-data
+      (with-silent-modifications
         (save-excursion
-          (let ((end-marker (copy-marker (or end (point-max))))
-                (start (or start (point-min))))
-            (goto-char start)
-            (while (and (re-search-forward "^$" end-marker t) (< (point) end-marker))
+          (goto-char (or start (point-min)))
+          (save-match-data
+            (while (and (re-search-forward "^$" nil t) (< (point) (point-max)))
               (let (line-start line-end next-start next-end)
                 (save-excursion
                   ;; Check previous line indent
@@ -174,11 +225,10 @@ file."
                          (next-indent (- next-end next-start))
                          (indent (min line-indent next-indent)))
                     (insert (make-string (if (zerop indent) 0 (1+ indent)) ? )))))
-              (forward-line 1)))))
-      (set-buffer-modified-p nil))
+              (forward-line 1))))))
     nil)
 
-  (add-hook! (highlight-indentation-mode highlight-indentation-current-column-mode)
+  (defun doom|init-highlight-indentation ()
     (if (or highlight-indentation-mode highlight-indentation-current-column-mode)
         (progn
           (doom|inject-trailing-whitespace)
@@ -186,7 +236,10 @@ file."
           (add-hook 'after-save-hook #'doom|inject-trailing-whitespace nil t))
       (remove-hook 'before-save-hook #'delete-trailing-whitespace t)
       (remove-hook 'after-save-hook #'doom|inject-trailing-whitespace t)
-      (delete-trailing-whitespace))))
+      (with-silent-modifications
+        (delete-trailing-whitespace))))
+  (add-hook! (highlight-indentation-mode highlight-indentation-current-column-mode)
+    #'doom|init-highlight-indentation))
 
 ;; For modes that don't adequately highlight numbers
 (def-package! highlight-numbers :commands highlight-numbers-mode)
@@ -196,11 +249,16 @@ file."
   :init
   (add-hook! (linum-mode nlinum-mode) #'hl-line-mode)
   :config
-  ;; stickiness doesn't play nice with emacs 25+
+  ;; I don't need hl-line showing in other windows. This also offers a small
+  ;; speed boost when buffer is displayed in multiple windows.
   (setq hl-line-sticky-flag nil
         global-hl-line-sticky-flag nil)
 
-  ;; acts weird with evil visual mode, so disable it temporarily
+  ;; Fix lingering hl-line overlays
+  (add-hook! 'hl-line-mode-hook
+    (remove-overlays (point-min) (point-max) 'face 'hl-line))
+
+  ;; Acts & looks weird with evil visual mode, so disable it temporarily
   (defun doom|hl-line-off () (hl-line-mode -1))
   (after! evil
     (add-hook! 'hl-line-mode-hook
@@ -213,52 +271,59 @@ file."
 (def-package! nlinum
   :commands nlinum-mode
   :preface
-  (defvar linum-format "%3d ")
-  (defvar nlinum-format "%4d ")
+  (defvar doom-ui-nlinum-lpad 4)
+  (defvar doom-ui-nlinum-rpad 1)
+  (defvar doom-ui-nlinum-spacer ?\u2002)
   :init
-  (add-hook! (prog-mode text-mode)
+  (defun doom|init-nlinum-mode ()
     (unless (eq major-mode 'org-mode)
       (nlinum-mode +1)))
-
+  (add-hook! (prog-mode text-mode) #'doom|init-nlinum-mode)
   :config
-  (defun doom-nlinum-flush-window (&optional window)
-    (let ((window (or window (selected-window)))
-          (orig-win (selected-window)))
-      (with-selected-window window
-        (when nlinum-mode
-          (if (not (eq window orig-win))
-              (nlinum--flush)
-            ;; done in two steps to leave current line number highlighting alone
-            (nlinum--region (point-min) (max 1 (1- (line-beginning-position))))
-            (nlinum--region (min (point-max) (1+ (line-end-position))) (point-max)))))))
+  (setq nlinum-highlight-current-line t)
 
-  ;; nlinum has a tendency to lose line numbers over time; a known issue. These
-  ;; hooks/advisors attempt to stave off these glitches.
-  (defun doom*nlinum-flush-all-windows (&rest _)
-    "Fix nlinum margins after major UI changes (like a change of font)."
-    (mapc #'doom-nlinum-flush-window (doom-visible-windows))
-    nil)
-  (advice-add #'set-frame-font :after #'doom*nlinum-flush-all-windows)
-
-  (defun doom*nlinum-flush (&optional _ norecord)
-    ;; norecord check is necessary to prevent infinite recursion in
-    ;; `select-window'
-    (when (not norecord) (doom-nlinum-flush-window)))
-  (advice-add #'select-window :before #'doom*nlinum-flush)
-  (advice-add #'select-window :after  #'doom*nlinum-flush)
-  (add-hook '+evil-esc-hook #'doom*nlinum-flush-all-windows t)
-  (add-hook 'focus-in-hook  #'doom*nlinum-flush-all-windows)
-  (add-hook 'focus-out-hook #'doom*nlinum-flush-all-windows)
-
-  ;;
-  (after! web-mode
-    (advice-add #'web-mode-fold-or-unfold :after #'doom*nlinum-flush))
+  (defun doom-nlinum-format-fn (line width)
+    "A more customizable `nlinum-format-function'. See `doom-ui-nlinum-lpad',
+`doom-ui-nlinum-rpad' and `doom-ui-nlinum-spacer'. Allows a fix for
+`whitespace-mode' space-marks appearing inside the line number."
+    (let ((str (number-to-string line)))
+      (setq str (concat (make-string (max 0 (- doom-ui-nlinum-lpad (length str)))
+                                     doom-ui-nlinum-spacer)
+                        str
+                        (make-string doom-ui-nlinum-rpad doom-ui-nlinum-spacer)))
+      (put-text-property 0 (length str) 'face
+                         (if (and nlinum-highlight-current-line
+                                  (= line nlinum--current-line))
+                             'nlinum-current-line
+                           'linum)
+                         str)
+      str))
+  (setq nlinum-format-function #'doom-nlinum-format-fn)
 
   ;; Optimization: calculate line number column width beforehand
-  (add-hook! nlinum-mode
+  (defun doom|init-nlinum-width ()
     (setq nlinum--width
           (length (save-excursion (goto-char (point-max))
-                                  (format-mode-line "%l"))))))
+                                  (format-mode-line "%l")))))
+  (add-hook 'nlinum-mode-hook #'doom|init-nlinum-width))
+
+;; Fixes disappearing line numbers in nlinum and other quirks
+(def-package! nlinum-hl
+  :load-path "~/work/plugins/emacs-nlinum-hl/"
+  :after nlinum
+  :config
+  ;; With `markdown-fontify-code-blocks-natively' enabled in `markdown-mode',
+  ;; line numbers tend to vanish next to code blocks.
+  (advice-add #'markdown-fontify-code-block-natively
+              :after #'nlinum-hl-do-markdown-fontify-region)
+
+  ;; When using `web-mode's code-folding an entire range of line numbers will
+  ;; vanish in the affected area.
+  (advice-add #'web-mode-fold-or-unfold :after #'nlinum-hl-do-generic-flush)
+
+  ;; Changing fonts can leave nlinum line numbers in their original size; this
+  ;; forces them to resize.
+  (advice-add #'set-frame-font :after #'nlinum-hl-flush-all-windows))
 
 ;; Helps us distinguish stacked delimiter pairs. Especially in parentheses-drunk
 ;; languages like Lisp.
@@ -269,9 +334,8 @@ file."
 
 ;; indicators for empty lines past EOF
 (def-package! vi-tilde-fringe
-  :when (display-graphic-p)
-  :demand t
-  :config (global-vi-tilde-fringe-mode t))
+  :commands global-vi-tilde-fringe-mode
+  :init (add-hook 'doom-init-hook #'global-vi-tilde-fringe-mode))
 
 ;; For a distractions-free-like UI, that dynamically resizes margets and can
 ;; center a buffer.
@@ -297,12 +361,11 @@ file."
              (byte-compile #',sym))))))
 
 (defsubst doom--prepare-modeline-segments (segments)
-  (let (segs)
-    (dolist (seg segments (nreverse segs))
-      (push (if (stringp seg)
-                seg
-              (list (intern (format "doom-modeline-segment--%s" (symbol-name seg)))))
-            segs))))
+  (cl-loop for seg in segments
+           if (stringp seg)
+            collect seg
+           else
+            collect (list (intern (format "doom-modeline-segment--%s" (symbol-name seg))))))
 
 (defmacro def-modeline! (name lhs &optional rhs)
   "Defines a modeline format and byte-compiles it. NAME is a symbol to identify

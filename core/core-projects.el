@@ -1,14 +1,11 @@
-;;; core-projects.el --- tools for getting around your project
-
-;; I want Emacs to be aware of the projects. `projectile' provides tools for
-;; digging through project files and exposing an API I can use to make other
-;; plugins/features project-aware.
+;;; core-projects.el -*- lexical-binding: t; -*-
 
 (defvar doom-project-hook nil
   "Hook run when a project is enabled. The name of the project's mode and its
 state are passed in.")
 
-(def-package! projectile :demand t
+(def-package! projectile
+  :demand t
   :init
   (setq projectile-cache-file (concat doom-cache-dir "projectile.cache")
         projectile-enable-caching (not noninteractive)
@@ -24,7 +21,7 @@ state are passed in.")
           "build.gradle"))
 
   :config
-  (projectile-mode +1)
+  (add-hook 'doom-init-hook #'projectile-mode)
 
   (setq projectile-other-file-alist
         (append '(("less" "css")
@@ -151,7 +148,7 @@ see if NAME should be activated.
        (add-hook! ,name
          (run-hook-with-args 'doom-project-hook ',name))
        ,(when init-form
-          `(add-transient-hook! ',(intern-soft (format "%s-hook" name))
+          `(add-transient-hook! ',(intern (format "%s-hook" name))
              ,init-form)))))
 
 (provide 'core-projects)
